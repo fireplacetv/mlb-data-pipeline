@@ -1,0 +1,11 @@
+data/
+.venv/
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+.git/
+__pycache__/
+*.pyc
+.env
+.env.local
+.DS_Store

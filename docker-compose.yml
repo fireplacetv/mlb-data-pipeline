@@ -1,0 +1,26 @@
+x-mlb-base: &mlb-base
+  build:
+    context: .
+    args:
+      UID: ${UID:-1000}
+      GID: ${GID:-1000}
+  image: mlb-pipeline:dev
+  env_file: .env
+  environment:
+    MLB_DATA_DIR: /data
+    DBT_PROFILES_DIR: /app/dbt
+    DBT_PROJECT_DIR: /app/dbt
+    TZ: America/Los_Angeles
+  volumes:
+    - .:/app
+    - ./data:/data
+
+services:
+  pipeline:
+    <<: *mlb-base
+
+  dbt:
+    <<: *mlb-base
+    working_dir: /app/dbt
+    command: ["build"]
+    entrypoint: ["/opt/venv/bin/dbt"]

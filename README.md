@@ -1,0 +1,124 @@
+# MLB Data Pipeline
+
+A containerized **ELT data pipeline** for MLB Statcast (Baseball Savant) and MLB Stats API data.
+
+- **Extract + Load:** [dlt](https://dlthub.com/) pulls raw data from Baseball Savant (via [pybaseball](https://github.com/jldbc/pybaseball)) and the MLB Stats API, landing it as Parquet files in a local data lake.
+- **Transform (minimal):** [dbt](https://www.getdbt.com/) builds a thin staging layer in [DuckDB](https://duckdb.org/): typed, renamed, deduplicated. One model per raw table, no business logic.
+- **Warehouse:** DuckDB, local.
+
+On a clean machine with only Docker and git, follow the Quick Start below to ingest two days of data and build the staging layer in under five minutes.
+
+**Read [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design and [`CLAUDE.md`](./CLAUDE.md) for coding conventions.**
+
+---
+
+## Quick Start
+
+### 1. Prerequisites
+
+- **Docker** (Desktop on macOS/Windows, or Engine + Compose v2 on Linux)
+- **git**
+
+No local Python setup needed.
+
+### 2. Clone and configure
+
+```bash
+git clone <repo>
+cd mlb-data-pipeline
+cp .env.example .env
+```
+
+Edit `.env` if needed (the defaults work for most users). On Linux, set your user ID:
+
+```bash
+export UID=$(id -u) GID=$(id -g)
+```
+
+See [`docs/setup.md`](./docs/setup.md) for detailed setup instructions.
+
+### 3. Build the Docker image
+
+```bash
+docker compose build
+```
+
+### 4. Ingest data (two days as a quick test)
+
+```bash
+# Statcast (Baseball Savant pitch-level data)
+docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2025-09-01 --end 2025-09-02
+
+# MLB Stats API (schedule, boxscores, standings, teams, rosters, people)
+docker compose run --rm pipeline python -m mlb.pipelines.mlb_api --start 2025-09-01 --end 2025-09-02
+```
+
+Data lands in `data/lake/` as Parquet files.
+
+### 5. Build and test the staging layer
+
+```bash
+docker compose run --rm dbt build
+```
+
+Staging models land in DuckDB at `data/warehouse/mlb.duckdb`.
+
+### 6. Run tests and linting
+
+```bash
+docker compose run --rm pipeline pytest
+docker compose run --rm pipeline ruff check .
+docker compose run --rm pipeline ruff format --check .
+```
+
+---
+
+## Commands Reference
+
+See [`docs/usage.md`](./docs/usage.md) for full details on each command.
+
+| Task | Command |
+|---|---|
+| Build the image | `docker compose build` |
+| Ingest Statcast (catch up since last load) | `docker compose run --rm pipeline python -m mlb.pipelines.statcast` |
+| Ingest Statcast (backfill a date range) | `docker compose run --rm pipeline python -m mlb.pipelines.statcast --start YYYY-MM-DD --end YYYY-MM-DD` |
+| Ingest MLB Stats API | `docker compose run --rm pipeline python -m mlb.pipelines.mlb_api` (same flags) |
+| Build and test staging | `docker compose run --rm dbt build` |
+| Rebuild from scratch | `docker compose run --rm dbt build --full-refresh` |
+| Run only some models | `docker compose run --rm dbt build --select stg_statcast__pitches` |
+| Unit tests | `docker compose run --rm pipeline pytest` |
+| Lint | `docker compose run --rm pipeline ruff check .` |
+| Format check | `docker compose run --rm pipeline ruff format --check .` |
+| Auto-fix and format | `docker compose run --rm pipeline ruff check --fix . && docker compose run --rm pipeline ruff format .` |
+| Shell in the container | `docker compose run --rm pipeline bash` |
+| Reset the warehouse | `rm -rf data/warehouse` (safe: rebuilt from the lake) |
+
+---
+
+## Documentation
+
+- **[`docs/setup.md`](./docs/setup.md):** Environment setup, first run, troubleshooting.
+- **[`docs/usage.md`](./docs/usage.md):** Detailed command reference.
+- **[`docs/configuration.md`](./docs/configuration.md):** Every environment variable and config option.
+- **[`docs/roadmap/`](./docs/roadmap/):** Design docs for future development phases.
+- **[`ARCHITECTURE.md`](./ARCHITECTURE.md):** Full design spec, data sources, extract/load, staging, warehouse, Docker setup.
+- **[`CLAUDE.md`](./CLAUDE.md):** Coding conventions and how to work here.
+
+---
+
+## Tech Stack
+
+| Layer | Tool |
+|---|---|
+| Language | Python 3.12, [`uv`](https://docs.astral.sh/uv/) |
+| Environment | Docker + Docker Compose |
+| Extract + Load | [dlt](https://dlthub.com/) with Parquet destination |
+| Warehouse | [DuckDB](https://duckdb.org/) |
+| Transform | [dbt-core](https://www.getdbt.com/) + [dbt-duckdb](https://github.com/duckdb/dbt-duckdb) |
+| Quality | dbt tests, [pytest](https://pytest.org/), [ruff](https://docs.astral.sh/ruff/) |
+
+---
+
+## License
+
+This project is personal and non-commercial. Data is MLB's. See [`ARCHITECTURE.md`](./ARCHITECTURE.md#61-data-sources) for data terms of use.

@@ -1,0 +1,7 @@
+mlb:
+  target: duckdb
+  outputs:
+    duckdb:
+      type: duckdb
+      path: "{{ env_var('MLB_DATA_DIR', '../data') }}/warehouse/mlb.duckdb"
+      threads: 4

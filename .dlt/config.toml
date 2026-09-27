@@ -1,0 +1,5 @@
+[runtime]
+log_level = "WARNING"
+
+[destination.filesystem]
+layout = "{table_name}/{load_id}.{file_id}.{ext}"

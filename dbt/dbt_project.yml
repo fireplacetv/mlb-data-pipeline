@@ -1,0 +1,30 @@
+name: "mlb"
+version: "1.0.0"
+config-version: 2
+
+profile: "mlb"
+model-paths: ["models"]
+test-paths: ["tests"]
+data-paths: ["data"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+  - "logs"
+
+models:
+  mlb:
+    staging:
+      +materialized: table
+      +schema: staging
+      +description: "Staging layer: one model per raw table, renamed and deduplicated"
+      +tests:
+        - not_null:
+            severity: error
+
+vars:
+  check_freshness: false
+
+packages-install-path: /opt/dbt_packages

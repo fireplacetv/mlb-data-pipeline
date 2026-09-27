@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mlb"]
+
+[project]
+name = "mlb-data-pipeline"
+version = "0.1.0"
+description = "ELT data pipeline for MLB Statcast and Stats API data"
+requires-python = ">=3.12"
+dependencies = [
+    "dlt[parquet]>=1.30.0",
+    "pybaseball>=0.1.0",
+    "pandas>=2.0.0",
+    "pyarrow>=14.0.0",
+    "duckdb>=1.0.0",
+    "dbt-core>=1.9.0",
+    "dbt-duckdb>=1.9.0",
+]
+
+[tool.uv]
+managed = true
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "ruff>=0.6.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.format]
+quote-style = "double"
+line-ending = "auto"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
