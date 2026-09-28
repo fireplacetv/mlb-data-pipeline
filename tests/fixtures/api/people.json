@@ -1,0 +1,315 @@
+{
+  "copyright": "Copyright 2025 MLB Advanced Media, L.P.  Use of any content on this page acknowledges agreement to the terms posted here http://gdx.mlb.com/components/copyright.txt",
+  "people": [
+    {
+      "id": 660271,
+      "fullName": "Shohei Ohtani",
+      "link": "/api/v1/people/660271",
+      "firstName": "Shohei",
+      "lastName": "Ohtani",
+      "primaryNumber": "17",
+      "active": true,
+      "primaryPosition": {
+        "code": "10",
+        "name": "Designated Hitter",
+        "type": "Hitter",
+        "abbreviation": "DH"
+      },
+      "useName": "Shohei",
+      "useLastName": "Ohtani",
+      "boxscoreName": "Ohtani",
+      "gender": "M",
+      "isPlayer": true,
+      "isVerified": true,
+      "batSide": {
+        "code": "L",
+        "description": "Left"
+      },
+      "pitchHand": {
+        "code": "R",
+        "description": "Right"
+      },
+      "nameFirstLast": "Shohei Ohtani",
+      "nameSlug": "shohei-ohtani-660271"
+    },
+    {
+      "id": 605141,
+      "fullName": "Mookie Betts",
+      "link": "/api/v1/people/605141",
+      "firstName": "Mookie",
+      "lastName": "Betts",
+      "primaryNumber": "50",
+      "active": true,
+      "primaryPosition": {
+        "code": "6",
+        "name": "Shortstop",
+        "type": "Infielder",
+        "abbreviation": "SS"
+      },
+      "useName": "Mookie",
+      "useLastName": "Betts",
+      "boxscoreName": "Betts",
+      "gender": "M",
+      "isPlayer": true,
+      "isVerified": true,
+      "batSide": {
+        "code": "R",
+        "description": "Right"
+      },
+      "pitchHand": {
+        "code": "R",
+        "description": "Right"
+      },
+      "nameFirstLast": "Mookie Betts",
+      "nameSlug": "mookie-betts-605141"
+    },
+    {
+      "id": 808967,
+      "fullName": "Yoshinobu Yamamoto",
+      "link": "/api/v1/people/808967",
+      "firstName": "Yoshinobu",
+      "lastName": "Yamamoto",
+      "primaryNumber": "18",
+      "active": true,
+      "primaryPosition": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "useName": "Yoshinobu",
+      "useLastName": "Yamamoto",
+      "boxscoreName": "Yamamoto",
+      "gender": "M",
+      "isPlayer": true,
+      "isVerified": true,
+      "batSide": {
+        "code": "R",
+        "description": "Right"
+      },
+      "pitchHand": {
+        "code": "R",
+        "description": "Right"
+      },
+      "nameFirstLast": "Yoshinobu Yamamoto",
+      "nameSlug": "yoshinobu-yamamoto-808967"
+    },
+    {
+      "id": 477132,
+      "fullName": "Clayton Kershaw",
+      "link": "/api/v1/people/477132",
+      "firstName": "Clayton",
+      "lastName": "Kershaw",
+      "primaryNumber": "22",
+      "active": true,
+      "primaryPosition": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "useName": "Clayton",
+      "useLastName": "Kershaw",
+      "boxscoreName": "Kershaw",
+      "gender": "M",
+      "isPlayer": true,
+      "isVerified": true,
+      "batSide": {
+        "code": "L",
+        "description": "Left"
+      },
+      "pitchHand": {
+        "code": "L",
+        "description": "Left"
+      },
+      "nameFirstLast": "Clayton Kershaw",
+      "nameSlug": "clayton-kershaw-477132"
+    },
+    {
+      "id": 607192,
+      "fullName": "Tyler Glasnow",
+      "link": "/api/v1/people/607192",
+      "firstName": "Tyler",
+      "lastName": "Glasnow",
+      "primaryNumber": "31",
+      "active": true,
+      "primaryPosition": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "useName": "Tyler",
+      "useLastName": "Glasnow",
+      "boxscoreName": "Glasnow",
+      "gender": "M",
+      "isPlayer": true,
+      "isVerified": true,
+      "batSide": {
+        "code": "L",
+        "description": "Left"
+      },
+      "pitchHand": {
+        "code": "R",
+        "description": "Right"
+      },
+      "nameFirstLast": "Tyler Glasnow",
+      "nameSlug": "tyler-glasnow-607192"
+    },
+    {
+      "id": 656305,
+      "fullName": "Matt Chapman",
+      "link": "/api/v1/people/656305",
+      "firstName": "Matt",
+      "lastName": "Chapman",
+      "primaryNumber": "26",
+      "active": true,
+      "primaryPosition": {
+        "code": "5",
+        "name": "Third Base",
+        "type": "Infielder",
+        "abbreviation": "3B"
+      },
+      "useName": "Matt",
+      "useLastName": "Chapman",
+      "boxscoreName": "Chapman",
+      "gender": "M",
+      "isPlayer": true,
+      "isVerified": true,
+      "batSide": {
+        "code": "R",
+        "description": "Right"
+      },
+      "pitchHand": {
+        "code": "R",
+        "description": "Right"
+      },
+      "nameFirstLast": "Matt Chapman",
+      "nameSlug": "matt-chapman-656305"
+    },
+    {
+      "id": 671218,
+      "fullName": "Heliot Ramos",
+      "link": "/api/v1/people/671218",
+      "firstName": "Heliot",
+      "lastName": "Ramos",
+      "primaryNumber": "17",
+      "active": true,
+      "primaryPosition": {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+      },
+      "useName": "Heliot",
+      "useLastName": "Ramos",
+      "boxscoreName": "Ramos",
+      "gender": "M",
+      "isPlayer": true,
+      "isVerified": true,
+      "batSide": {
+        "code": "R",
+        "description": "Right"
+      },
+      "pitchHand": {
+        "code": "R",
+        "description": "Right"
+      },
+      "nameFirstLast": "Heliot Ramos",
+      "nameSlug": "heliot-ramos-671218"
+    },
+    {
+      "id": 657277,
+      "fullName": "Logan Webb",
+      "link": "/api/v1/people/657277",
+      "firstName": "Logan",
+      "lastName": "Webb",
+      "primaryNumber": "62",
+      "active": true,
+      "primaryPosition": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "useName": "Logan",
+      "useLastName": "Webb",
+      "boxscoreName": "Webb",
+      "gender": "M",
+      "isPlayer": true,
+      "isVerified": true,
+      "batSide": {
+        "code": "R",
+        "description": "Right"
+      },
+      "pitchHand": {
+        "code": "R",
+        "description": "Right"
+      },
+      "nameFirstLast": "Logan Webb",
+      "nameSlug": "logan-webb-657277"
+    },
+    {
+      "id": 592662,
+      "fullName": "Robbie Ray",
+      "link": "/api/v1/people/592662",
+      "firstName": "Robbie",
+      "lastName": "Ray",
+      "primaryNumber": "23",
+      "active": true,
+      "primaryPosition": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "useName": "Robbie",
+      "useLastName": "Ray",
+      "boxscoreName": "Ray",
+      "gender": "M",
+      "isPlayer": true,
+      "isVerified": true,
+      "batSide": {
+        "code": "L",
+        "description": "Left"
+      },
+      "pitchHand": {
+        "code": "L",
+        "description": "Left"
+      },
+      "nameFirstLast": "Robbie Ray",
+      "nameSlug": "robbie-ray-592662"
+    },
+    {
+      "id": 434378,
+      "fullName": "Justin Verlander",
+      "link": "/api/v1/people/434378",
+      "firstName": "Justin",
+      "lastName": "Verlander",
+      "primaryNumber": "35",
+      "active": true,
+      "primaryPosition": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "useName": "Justin",
+      "useLastName": "Verlander",
+      "boxscoreName": "Verlander",
+      "gender": "M",
+      "isPlayer": true,
+      "isVerified": true,
+      "batSide": {
+        "code": "R",
+        "description": "Right"
+      },
+      "pitchHand": {
+        "code": "R",
+        "description": "Right"
+      },
+      "nameFirstLast": "Justin Verlander",
+      "nameSlug": "justin-verlander-434378"
+    }
+  ]
+}

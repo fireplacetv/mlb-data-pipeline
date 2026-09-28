@@ -1,0 +1,386 @@
+{
+  "copyright": "Copyright 2025 MLB Advanced Media, L.P.  Use of any content on this page acknowledges agreement to the terms posted here http://gdx.mlb.com/components/copyright.txt",
+  "teams": {
+    "away": {
+      "team": {
+        "id": 119,
+        "name": "Los Angeles Dodgers",
+        "link": "/api/v1/teams/119"
+      },
+      "teamStats": {
+        "batting": {
+          "runs": 4,
+          "hits": 7,
+          "atBats": 33,
+          "avg": ".256"
+        },
+        "pitching": {
+          "inningsPitched": "9.0",
+          "era": "3.91"
+        },
+        "fielding": {
+          "errors": 0,
+          "putOuts": 27
+        }
+      },
+      "players": {
+        "ID660271": {
+          "person": {
+            "id": 660271,
+            "fullName": "Shohei Ohtani",
+            "link": "/api/v1/people/660271"
+          },
+          "jerseyNumber": "17",
+          "position": {
+            "code": "10",
+            "name": "Designated Hitter",
+            "type": "Hitter",
+            "abbreviation": "DH"
+          },
+          "status": {
+            "code": "A",
+            "description": "Active"
+          },
+          "parentTeamId": 119,
+          "battingOrder": "100",
+          "stats": {
+            "batting": {
+              "gamesPlayed": 1,
+              "runs": 1,
+              "doubles": 0,
+              "triples": 0,
+              "homeRuns": 1,
+              "strikeOuts": 1,
+              "baseOnBalls": 0,
+              "hits": 2,
+              "atBats": 4,
+              "rbi": 2,
+              "plateAppearances": 4,
+              "summary": "2-4"
+            },
+            "pitching": {},
+            "fielding": {}
+          },
+          "seasonStats": {
+            "batting": {
+              "avg": ".271",
+              "obp": ".345",
+              "slg": ".470",
+              "ops": ".815"
+            },
+            "pitching": {
+              "era": "-.--"
+            },
+            "fielding": {
+              "fielding": ".985"
+            }
+          },
+          "gameStatus": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "allPositions": [
+            {
+              "code": "10",
+              "name": "Designated Hitter",
+              "type": "Hitter",
+              "abbreviation": "DH"
+            }
+          ]
+        },
+        "ID607192": {
+          "person": {
+            "id": 607192,
+            "fullName": "Tyler Glasnow",
+            "link": "/api/v1/people/607192"
+          },
+          "jerseyNumber": "31",
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "status": {
+            "code": "A",
+            "description": "Active"
+          },
+          "parentTeamId": 119,
+          "stats": {
+            "batting": {},
+            "pitching": {
+              "gamesPlayed": 1,
+              "gamesStarted": 1,
+              "inningsPitched": "6.0",
+              "hits": 5,
+              "runs": 2,
+              "earnedRuns": 2,
+              "strikeOuts": 7,
+              "baseOnBalls": 1,
+              "numberOfPitches": 94,
+              "pitchesThrown": 94,
+              "summary": "6.0 IP, 2 ER, 7 K, 1 BB"
+            },
+            "fielding": {}
+          },
+          "seasonStats": {
+            "batting": {
+              "avg": ".271",
+              "obp": ".345",
+              "slg": ".470",
+              "ops": ".815"
+            },
+            "pitching": {
+              "era": "3.12",
+              "whip": "1.10"
+            },
+            "fielding": {
+              "fielding": ".985"
+            }
+          },
+          "gameStatus": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "allPositions": [
+            {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            }
+          ]
+        }
+      },
+      "batters": [
+        660271,
+        607192
+      ],
+      "pitchers": [
+        607192
+      ],
+      "bench": [],
+      "bullpen": [],
+      "battingOrder": [
+        660271
+      ],
+      "info": [
+        {
+          "title": "BATTING",
+          "fieldList": [
+            {
+              "label": "HR",
+              "value": "Ohtani (30)."
+            }
+          ]
+        }
+      ],
+      "note": []
+    },
+    "home": {
+      "team": {
+        "id": 137,
+        "name": "San Francisco Giants",
+        "link": "/api/v1/teams/137"
+      },
+      "teamStats": {
+        "batting": {
+          "runs": 1,
+          "hits": 9,
+          "atBats": 33,
+          "avg": ".256"
+        },
+        "pitching": {
+          "inningsPitched": "9.0",
+          "era": "3.91"
+        },
+        "fielding": {
+          "errors": 0,
+          "putOuts": 27
+        }
+      },
+      "players": {
+        "ID656305": {
+          "person": {
+            "id": 656305,
+            "fullName": "Matt Chapman",
+            "link": "/api/v1/people/656305"
+          },
+          "jerseyNumber": "26",
+          "position": {
+            "code": "5",
+            "name": "Third Base",
+            "type": "Infielder",
+            "abbreviation": "3B"
+          },
+          "status": {
+            "code": "A",
+            "description": "Active"
+          },
+          "parentTeamId": 137,
+          "battingOrder": "100",
+          "stats": {
+            "batting": {
+              "gamesPlayed": 1,
+              "runs": 1,
+              "doubles": 0,
+              "triples": 0,
+              "homeRuns": 1,
+              "strikeOuts": 1,
+              "baseOnBalls": 0,
+              "hits": 2,
+              "atBats": 4,
+              "rbi": 2,
+              "plateAppearances": 4,
+              "summary": "2-4"
+            },
+            "pitching": {},
+            "fielding": {}
+          },
+          "seasonStats": {
+            "batting": {
+              "avg": ".271",
+              "obp": ".345",
+              "slg": ".470",
+              "ops": ".815"
+            },
+            "pitching": {
+              "era": "-.--"
+            },
+            "fielding": {
+              "fielding": ".985"
+            }
+          },
+          "gameStatus": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "allPositions": [
+            {
+              "code": "5",
+              "name": "Third Base",
+              "type": "Infielder",
+              "abbreviation": "3B"
+            }
+          ]
+        },
+        "ID434378": {
+          "person": {
+            "id": 434378,
+            "fullName": "Justin Verlander",
+            "link": "/api/v1/people/434378"
+          },
+          "jerseyNumber": "35",
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "status": {
+            "code": "A",
+            "description": "Active"
+          },
+          "parentTeamId": 137,
+          "stats": {
+            "batting": {},
+            "pitching": {
+              "gamesPlayed": 1,
+              "gamesStarted": 1,
+              "inningsPitched": "6.0",
+              "hits": 5,
+              "runs": 2,
+              "earnedRuns": 2,
+              "strikeOuts": 7,
+              "baseOnBalls": 1,
+              "numberOfPitches": 94,
+              "pitchesThrown": 94,
+              "summary": "6.0 IP, 2 ER, 7 K, 1 BB"
+            },
+            "fielding": {}
+          },
+          "seasonStats": {
+            "batting": {
+              "avg": ".271",
+              "obp": ".345",
+              "slg": ".470",
+              "ops": ".815"
+            },
+            "pitching": {
+              "era": "3.12",
+              "whip": "1.10"
+            },
+            "fielding": {
+              "fielding": ".985"
+            }
+          },
+          "gameStatus": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "allPositions": [
+            {
+              "code": "1",
+              "name": "Pitcher",
+              "type": "Pitcher",
+              "abbreviation": "P"
+            }
+          ]
+        }
+      },
+      "batters": [
+        656305,
+        434378
+      ],
+      "pitchers": [
+        434378
+      ],
+      "bench": [],
+      "bullpen": [],
+      "battingOrder": [
+        656305
+      ],
+      "info": [
+        {
+          "title": "BATTING",
+          "fieldList": [
+            {
+              "label": "HR",
+              "value": "Chapman (30)."
+            }
+          ]
+        }
+      ],
+      "note": []
+    }
+  },
+  "officials": [
+    {
+      "official": {
+        "id": 427044,
+        "fullName": "Home Plate Umpire",
+        "link": "/api/v1/people/427044"
+      },
+      "officialType": "Home Plate"
+    }
+  ],
+  "info": [
+    {
+      "label": "Weather",
+      "value": "68 degrees, Partly Cloudy."
+    },
+    {
+      "label": "T",
+      "value": "2:31."
+    }
+  ],
+  "pitchingNotes": []
+}

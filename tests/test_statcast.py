@@ -10,7 +10,7 @@ import pyarrow.parquet as pq
 import pytest
 from pybaseball.datasources.statcast import get_statcast_data_from_csv
 
-from mlb.pipelines import statcast
+from mlb.pipelines import common, statcast
 
 FIXTURE = Path(__file__).parent / "fixtures" / "statcast" / "statcast_2025-09-01.csv"
 FIXTURE_ROWS = 6
@@ -221,7 +221,7 @@ def test_schema_changes_are_logged(caplog: pytest.LogCaptureFixture) -> None:
     after = {"pitches": {"game_pk", "release_speed", "bat_speed", "release_speed__v_text"}}
 
     with caplog.at_level("INFO"):
-        statcast.log_schema_changes(before, after | {"new_table": {"a"}})
+        common.log_schema_changes(before, after | {"new_table": {"a"}})
 
     assert "new table new_table" in caplog.text
     assert "bat_speed" in caplog.text

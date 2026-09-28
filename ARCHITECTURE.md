@@ -115,6 +115,7 @@ mlb-pipeline/
 │   ├── __init__.py
 │   ├── config.py                # env vars, paths, date-window helpers
 │   └── pipelines/
+│       ├── common.py            # shared dlt helpers: lake pipeline, watermark, run logging
 │       ├── statcast.py          # dlt resource + pipeline
 │       └── mlb_api.py           # dlt REST API source + pipeline
 ├── dbt/
@@ -199,17 +200,24 @@ The pybaseball README notes that Statcast data can change even for past seasons.
 - `pipeline_name="mlb_api"`, `dataset_name="raw_mlb"`
 - Runnable directly: `python -m mlb.pipelines.mlb_api [--start ... --end ...]`, same flags and defaults as Statcast.
 - dlt REST API source with base URL `https://statsapi.mlb.com`. Verify each path and its response shape against a live call, and record the response as a fixture.
-- **One day at a time, like Statcast.** A REST source run fails as a whole, so the pipeline loops over the window's days and runs `schedule` and `boxscore` for one day per iteration (building the config with that day's dates). A failed day is isolated, and the watermark rules in §6.6 apply per day. The snapshot resources (`teams`, `standings`, `rosters`, `people`) run once, after the daily loop.
+- **One day at a time, like Statcast.** A REST source run fails as a whole, so the pipeline loops over the window's days and runs `schedule` and `boxscore` for one day per iteration (building the config with that day's dates). A failed day is isolated, and the watermark rules in §6.6 apply per day. Days outside a season (§6.3) are skipped. The snapshot resources (`teams`, `standings`, `rosters`) run once, after the daily loop, and `people` runs last.
+- **Each step is its own dlt load**, all under one source named `mlb_api` (so they share one schema and one source state): one load per day, one snapshot load, and one `people` load. A two-day window makes four loads. The `people` load also saves the watermark and the fetched-ID set, so neither moves unless every earlier step finished; an exception in the snapshot or `people` step fails the run with the watermark unchanged.
 
-| Resource | Endpoint (approx.) | Disposition | Notes |
+| Resource | Endpoint | Disposition | Notes |
 |---|---|---|---|
-| `schedule` | `/api/v1/schedule?sportId=1&startDate=&endDate=` | append | Select `dates[].games[]` so one row = one game. Key `game_pk`. |
-| `boxscore` | `/api/v1/game/{game_pk}/boxscore` | append | Dependent on `schedule`, **Final games only** (filter with `processing_steps`). Nested players become child tables. |
-| `standings` | `/api/v1/standings?leagueId=103,104&season=&date=` | append | One snapshot per run, as of the window's end date (§6.6) |
-| `teams` | `/api/v1/teams?sportId=1&season=` | append | One snapshot per season touched by the window. Staging keeps the latest per team × season. |
-| `rosters` | `/api/v1/teams/{team_id}/roster?rosterType=40Man&date=` | append | One snapshot per team per run, as of the window's end date (§6.6), dependent on `teams` |
-| `people` | `/api/v1/people/{id}` | append | Bios only for player IDs not fetched before (§6.6) |
+| `schedule` | `/api/v1/schedule?sportId=1&startDate=&endDate=` | append | Select `dates[*].games[*]` so one row = one game. Key `game_pk`. |
+| `boxscore` | `/api/v1/game/{game_pk}/boxscore` | append | **Final games only.** Dependent on an unloaded `final_games` resource (the same schedule call, filtered with `processing_steps`), because a filter on `schedule` itself would also drop non-Final games from the `schedule` table. Players become one child table (below). |
+| `standings` | `/api/v1/standings?leagueId=103,104&season=&date=` | append | One snapshot per run, as of the window's end date (§6.6). Select `records` (one row per division); `teamRecords` becomes a child table. |
+| `teams` | `/api/v1/teams?sportId=1&season=` | append | One snapshot per season touched by the window (one resource per season, `teams_<season>`, all writing the `teams` table). Staging keeps the latest per team × season. |
+| `rosters` | `/api/v1/teams/{team_id}/roster?rosterType=40Man&date=` | append | One snapshot per team per run, as of the window's end date (§6.6), dependent on the end date's season of `teams` |
+| `people` | `/api/v1/people?personIds=<id>,<id>,...` | append | Bios only for player IDs not fetched before (§6.6), up to 100 IDs per request (the batch form of `/api/v1/people/{id}`) |
 
+- **Final** means `status.codedGameState` is `F` (Final) or `O` (Game Over). Postponed (`D`) and cancelled (`C`) games also report `abstractGameState = "Final"`, so that field can't be used.
+- **Minimal row shaping** (`processing_steps` maps). These change structure, never values, and exist so each staging model can read one raw table without joins (§7.1):
+  - `boxscore`: the API keys players by `"ID<person id>"` under `teams.away.players` and `teams.home.players`. Left as is, dlt would create a column per player per stat. The map moves both sides into one `players` list, so dlt makes one child table, `boxscore__players` (one row per player per game). Each player row gets `game_pk`, `team_id`, and `side` (`away`/`home`). The boxscore row gets `game_pk` too, which the response lacks (it comes from the parent schedule row via `include_from_parent`).
+  - `standings`: each division record and each of its team records gets `as_of_date` (the requested date, which the response lacks).
+  - `rosters`: each entry gets `team_id` (from the parent `teams` row) and `roster_date`.
+- **Load ids on child tables.** dlt stamps `_dlt_load_id` on root rows only. The source sets the relational normalizer's root propagation (`_dlt_load_id` → `_dlt_load_id`), so every nested table carries it and staging can filter and deduplicate child tables the same way as root tables (§7.3). The setting is saved in the exported schema.
 - Same incremental rules as Statcast (§6.6), with its own watermark.
 - Giants `team_id` = `137` goes in config, not code. Nothing in this plan filters to the Giants yet; all teams are loaded.
 
@@ -372,14 +380,16 @@ The column list is a starting point. Build the final list from the CSV docs and 
 | `stg_dlt__completed_loads` | `_dlt_loads` marker files, read with DuckDB `glob()` | dataset × load | `dataset, load_id` |
 | `stg_statcast__pitches` | `raw_statcast.pitches` | pitch | `game_pk, at_bat_number, pitch_number` |
 | `stg_mlb__games` | `raw_mlb.schedule` | game | `game_pk` |
-| `stg_mlb__boxscore_batters` | `raw_mlb.boxscore__*` batter child table | player × game | `game_pk, player_id` |
-| `stg_mlb__boxscore_pitchers` | `raw_mlb.boxscore__*` pitcher child table | player × game | `game_pk, player_id` |
-| `stg_mlb__standings` | `raw_mlb.standings__*` team records | team × as-of date | `team_id, as_of_date` |
+| `stg_mlb__boxscore_batters` | `raw_mlb.boxscore__players`, rows with batting stats | player × game | `game_pk, player_id` |
+| `stg_mlb__boxscore_pitchers` | `raw_mlb.boxscore__players`, rows with pitching stats | player × game | `game_pk, player_id` |
+| `stg_mlb__standings` | `raw_mlb.standings__team_records` | team × as-of date | `team_id, as_of_date` |
 | `stg_mlb__teams` | `raw_mlb.teams` | team × season | `team_id, season` |
 | `stg_mlb__rosters` | `raw_mlb.rosters` | player × team × roster date | `player_id, team_id, roster_date` |
 | `stg_mlb__people` | `raw_mlb.people` | player | `player_id` |
 
-`stg_dlt__completed_loads` also exposes `loaded_at` (the load id converted to a timestamp) for the recency test. The exact raw child-table names (`boxscore__teams__...`) come from dlt's normalization. Inspect `_dlt_version` / the lake folders after M2 and fill them in.
+`stg_dlt__completed_loads` also exposes `loaded_at` (the load id converted to a timestamp) for the recency test.
+
+Raw child-table names come from dlt's normalization (§6.4). As of M2: `boxscore__players` holds one row per player per game, with `game_pk`, `team_id`, `side`, `person__id`, and the game's stats flattened into `stats__batting__*` / `stats__pitching__*` columns (a player who didn't bat or pitch has nulls there). `standings__team_records` holds one row per team with `as_of_date` and `team__id`. Both carry `_dlt_load_id`. Other boxscore child tables (`boxscore__teams__{away,home}__{batters,pitchers,batting_order,info}`, `boxscore__officials`, `boxscore__info`, `boxscore__players__all_positions`) have no staging model in this plan. Check `schemas/export/mlb_api.schema.yaml` after a live run before writing the models.
 
 ### 7.5 Tests
 

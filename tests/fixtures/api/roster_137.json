@@ -1,0 +1,103 @@
+{
+  "copyright": "Copyright 2025 MLB Advanced Media, L.P.  Use of any content on this page acknowledges agreement to the terms posted here http://gdx.mlb.com/components/copyright.txt",
+  "roster": [
+    {
+      "person": {
+        "id": 656305,
+        "fullName": "Matt Chapman",
+        "link": "/api/v1/people/656305"
+      },
+      "jerseyNumber": "26",
+      "position": {
+        "code": "5",
+        "name": "Third Base",
+        "type": "Infielder",
+        "abbreviation": "3B"
+      },
+      "status": {
+        "code": "A",
+        "description": "Active"
+      },
+      "parentTeamId": 137
+    },
+    {
+      "person": {
+        "id": 671218,
+        "fullName": "Heliot Ramos",
+        "link": "/api/v1/people/671218"
+      },
+      "jerseyNumber": "17",
+      "position": {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
+      },
+      "status": {
+        "code": "A",
+        "description": "Active"
+      },
+      "parentTeamId": 137
+    },
+    {
+      "person": {
+        "id": 657277,
+        "fullName": "Logan Webb",
+        "link": "/api/v1/people/657277"
+      },
+      "jerseyNumber": "62",
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "status": {
+        "code": "A",
+        "description": "Active"
+      },
+      "parentTeamId": 137
+    },
+    {
+      "person": {
+        "id": 592662,
+        "fullName": "Robbie Ray",
+        "link": "/api/v1/people/592662"
+      },
+      "jerseyNumber": "23",
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "status": {
+        "code": "A",
+        "description": "Active"
+      },
+      "parentTeamId": 137
+    },
+    {
+      "person": {
+        "id": 434378,
+        "fullName": "Justin Verlander",
+        "link": "/api/v1/people/434378"
+      },
+      "jerseyNumber": "35",
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "status": {
+        "code": "A",
+        "description": "Active"
+      },
+      "parentTeamId": 137
+    }
+  ],
+  "link": "/api/v1/teams/137/roster",
+  "teamId": 137,
+  "rosterType": "40Man"
+}

@@ -1,0 +1,103 @@
+{
+  "copyright": "Copyright 2025 MLB Advanced Media, L.P.  Use of any content on this page acknowledges agreement to the terms posted here http://gdx.mlb.com/components/copyright.txt",
+  "roster": [
+    {
+      "person": {
+        "id": 660271,
+        "fullName": "Shohei Ohtani",
+        "link": "/api/v1/people/660271"
+      },
+      "jerseyNumber": "17",
+      "position": {
+        "code": "10",
+        "name": "Designated Hitter",
+        "type": "Hitter",
+        "abbreviation": "DH"
+      },
+      "status": {
+        "code": "A",
+        "description": "Active"
+      },
+      "parentTeamId": 119
+    },
+    {
+      "person": {
+        "id": 605141,
+        "fullName": "Mookie Betts",
+        "link": "/api/v1/people/605141"
+      },
+      "jerseyNumber": "50",
+      "position": {
+        "code": "6",
+        "name": "Shortstop",
+        "type": "Infielder",
+        "abbreviation": "SS"
+      },
+      "status": {
+        "code": "A",
+        "description": "Active"
+      },
+      "parentTeamId": 119
+    },
+    {
+      "person": {
+        "id": 808967,
+        "fullName": "Yoshinobu Yamamoto",
+        "link": "/api/v1/people/808967"
+      },
+      "jerseyNumber": "18",
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "status": {
+        "code": "A",
+        "description": "Active"
+      },
+      "parentTeamId": 119
+    },
+    {
+      "person": {
+        "id": 477132,
+        "fullName": "Clayton Kershaw",
+        "link": "/api/v1/people/477132"
+      },
+      "jerseyNumber": "22",
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "status": {
+        "code": "A",
+        "description": "Active"
+      },
+      "parentTeamId": 119
+    },
+    {
+      "person": {
+        "id": 607192,
+        "fullName": "Tyler Glasnow",
+        "link": "/api/v1/people/607192"
+      },
+      "jerseyNumber": "31",
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "status": {
+        "code": "A",
+        "description": "Active"
+      },
+      "parentTeamId": 119
+    }
+  ],
+  "link": "/api/v1/teams/119/roster",
+  "teamId": 119,
+  "rosterType": "40Man"
+}

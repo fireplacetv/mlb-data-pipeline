@@ -17,13 +17,14 @@ import pandas as pd
 from dlt.common.pipeline import LoadInfo
 
 from mlb import config
+from mlb.pipelines import common
 
 logger = logging.getLogger(__name__)
 
 PIPELINE_NAME = "statcast"
 DATASET_NAME = "raw_statcast"
 SOURCE_NAME = "statcast"
-WATERMARK_KEY = "loaded_through"
+WATERMARK_KEY = common.WATERMARK_KEY
 
 # Hints only for key columns; everything else is inferred (§6.5). Types match what
 # pybaseball returns with the locked pandas: nullable ints, and game_date as text
@@ -146,61 +147,23 @@ def statcast_source(
 
 def build_pipeline(data_dir: Path, schema_dir: Path) -> dlt.Pipeline:
     """Create the statcast dlt pipeline writing Parquet under data_dir/lake."""
-    return dlt.pipeline(
-        pipeline_name=PIPELINE_NAME,
-        destination=dlt.destinations.filesystem(bucket_url=str(data_dir / "lake")),
-        dataset_name=DATASET_NAME,
-        pipelines_dir=str(data_dir / "dlt_pipelines"),
-        export_schema_path=str(schema_dir),
-    )
+    return common.build_pipeline(PIPELINE_NAME, DATASET_NAME, data_dir, schema_dir)
 
 
 def stored_watermark(pipeline: dlt.Pipeline) -> date | None:
     """Return the watermark from the pipeline's local state."""
-    value = pipeline.state.get("sources", {}).get(SOURCE_NAME, {}).get(WATERMARK_KEY)
-    return date.fromisoformat(value) if value else None
+    return common.stored_watermark(pipeline, SOURCE_NAME)
 
 
 def restore_watermark(pipeline: dlt.Pipeline) -> date | None:
     """Sync state from the lake (restores a deleted pipelines dir), then read the watermark."""
-    pipeline.sync_destination()
-    return stored_watermark(pipeline)
-
-
-def table_columns(pipeline: dlt.Pipeline) -> dict[str, set[str]]:
-    """Map each data table in the pipeline's schema to its column names."""
-    if not pipeline.default_schema_name:
-        return {}
-    tables = pipeline.default_schema.data_tables()
-    return {t["name"]: set(t.get("columns", {})) for t in tables}
-
-
-def log_schema_changes(before: dict[str, set[str]], after: dict[str, set[str]]) -> None:
-    """Log new tables, new columns, and new variant columns between two snapshots."""
-    for table, columns in sorted(after.items()):
-        if table not in before:
-            logger.info("Schema change: new table %s (%d columns)", table, len(columns))
-            continue
-        added = sorted(columns - before[table])
-        variants = [c for c in added if "__v_" in c]
-        if added:
-            logger.info("Schema change: %s new columns: %s", table, ", ".join(added))
-        if variants:
-            logger.warning(
-                "Schema change: %s variant columns (type drift): %s", table, ", ".join(variants)
-            )
+    return common.restore_watermark(pipeline, SOURCE_NAME)
 
 
 def log_run_summary(pipeline: dlt.Pipeline, load_info: LoadInfo) -> None:
     """Log row counts per table and the duration of each dlt step."""
-    trace = pipeline.last_trace
-    row_counts = trace.last_normalize_info.row_counts if trace.last_normalize_info else {}
-    for table, count in sorted(row_counts.items()):
-        if not table.startswith("_dlt"):
-            logger.info("Rows loaded: %s = %d", table, count)
-    for step in trace.steps:
-        seconds = (step.finished_at - step.started_at).total_seconds()
-        logger.info("Step %s took %.1fs", step.step, seconds)
+    common.log_row_counts(common.last_row_counts(pipeline))
+    common.log_step_durations(pipeline)
     logger.info("Load ids: %s", ", ".join(load_info.loads_ids))
 
 
@@ -243,10 +206,10 @@ def run(
         enable_pybaseball_cache(data_dir / "cache" / "pybaseball")
 
     outcomes = DayOutcomes()
-    before = table_columns(pipeline)
+    before = common.table_columns(pipeline)
     source = statcast_source(window, loaded_through, fetch, sleep, outcomes)
     load_info = pipeline.run(source, loader_file_format="parquet")
-    log_schema_changes(before, table_columns(pipeline))
+    common.log_schema_changes(before, common.table_columns(pipeline))
     log_run_summary(pipeline, load_info)
     log_outcomes(outcomes)
     logger.info("Watermark now: %s", stored_watermark(pipeline) or "none")
