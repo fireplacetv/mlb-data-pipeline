@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # One known in-season day keeps the live ingest small and deterministic.
+  INGEST_START: "2025-09-01"
+  INGEST_END: "2025-09-01"
+
+jobs:
+  pipeline:
+    name: Ingest + dbt
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure environment
+        run: |
+          # Match the container user to the runner user so the bind-mounted
+          # repo and data/ are writable. UID is read-only in bash, so set it in
+          # .env, which compose reads for build-arg interpolation.
+          sed -e "s/^UID=.*/UID=$(id -u)/" -e "s/^GID=.*/GID=$(id -g)/" .env.example > .env
+          mkdir -p data
+
+      - name: Build image
+        run: docker compose build
+
+      - name: Ingest Statcast
+        if: hashFiles('src/mlb/pipelines/statcast.py') != ''
+        run: >
+          docker compose run --rm --entrypoint python pipeline
+          -m mlb.pipelines.statcast --start "$INGEST_START" --end "$INGEST_END"
+
+      - name: Ingest MLB Stats API
+        if: hashFiles('src/mlb/pipelines/mlb_api.py') != ''
+        run: >
+          docker compose run --rm --entrypoint python pipeline
+          -m mlb.pipelines.mlb_api --start "$INGEST_START" --end "$INGEST_END"
+
+      - name: Warn about missing pipelines
+        if: hashFiles('src/mlb/pipelines/statcast.py') == '' || hashFiles('src/mlb/pipelines/mlb_api.py') == ''
+        run: echo "::warning::A dlt pipeline module is not implemented yet (M1/M2); its ingest step was skipped."
+
+      - name: dbt run --empty
+        run: docker compose run --rm dbt run --empty
+
+      - name: dbt test
+        run: docker compose run --rm dbt test
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: |
+            data/logs/
+            dbt/logs/
+          if-no-files-found: ignore

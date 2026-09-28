@@ -188,6 +188,28 @@ docker compose run --rm pipeline ruff format .
 
 ---
 
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs on every pull request and on every push to `main` (i.e. on merge). On an `ubuntu-latest` runner it:
+
+1. Writes `.env` from `.env.example` with `UID`/`GID` set to the runner user, so the container can write to the bind-mounted `data/`.
+2. Runs `docker compose build`.
+3. Runs both dlt pipelines against the live sources for one fixed day (`INGEST_START`/`INGEST_END` at the top of the workflow, currently `2025-09-01`). A pipeline whose module doesn't exist yet is skipped with a warning annotation.
+4. Runs `dbt run --empty` (builds every model with zero rows, which checks that the SQL compiles and runs against the real lake schemas) and then `dbt test`.
+5. Uploads `data/logs/` and `dbt/logs/` as the `logs` artifact, even on failure.
+
+To reproduce CI locally:
+
+```bash
+docker compose build
+docker compose run --rm --entrypoint python pipeline -m mlb.pipelines.statcast --start 2025-09-01 --end 2025-09-01
+docker compose run --rm --entrypoint python pipeline -m mlb.pipelines.mlb_api --start 2025-09-01 --end 2025-09-01
+docker compose run --rm dbt run --empty
+docker compose run --rm dbt test
+```
+
+---
+
 ## Inspecting Data
 
 ### Query the warehouse

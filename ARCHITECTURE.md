@@ -477,7 +477,7 @@ services:
 
 Each pipeline module exits non-zero on failure and logs to stdout and `data/logs/`, with per-step durations and row counts.
 
-**CI (GitHub Actions, on PR):** builds the same image and runs inside it: `ruff check`, `ruff format --check`, `pytest`, and `dbt build` against the fixture lake. CI copies `tests/fixtures/lake/` into `lake/` under a temporary directory and sets `MLB_DATA_DIR` to that directory, so the warehouse never lands inside `tests/`. The fixture lake covers one date and includes a duplicate pitch across two loads, an incomplete load with no marker file, and a doubleheader.
+**CI (GitHub Actions, on PR and on push to `main`):** `.github/workflows/ci.yml` builds the same image with `docker compose build`, runs both dlt pipelines against the live sources for one fixed day (`2025-09-01`), then runs `dbt run --empty` and `dbt test`. A pipeline whose module doesn't exist yet is skipped with a warning, so the workflow is usable from M0. Logs from `data/logs/` and `dbt/logs/` are uploaded as an artifact. Planned for M4: add `ruff check`, `ruff format --check`, `pytest`, and a `dbt build` against the fixture lake. That job copies `tests/fixtures/lake/` into `lake/` under a temporary directory and sets `MLB_DATA_DIR` to that directory, so the warehouse never lands inside `tests/`. The fixture lake covers one date and includes a duplicate pitch across two loads, an incomplete load with no marker file, and a doubleheader.
 
 ### 9.1 Documentation (`docs/`)
 
