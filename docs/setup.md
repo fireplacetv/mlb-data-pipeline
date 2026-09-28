@@ -122,14 +122,18 @@ The pipelines create `data/` subdirectories automatically, but the `data/` folde
 
 ### Statcast ingest times out or rate-limits
 
-Baseball Savant asks for politeness (sleeps between requests). The pipeline includes delays and retries. If you're doing a large backfill, it may take many hours. See `docs/usage.md` for how to resume after a failure.
+Baseball Savant asks for politeness. The pipeline sleeps 2 seconds between days and retries a failed day 3 times with backoff. A day that still fails is logged and skipped; the other days load, and the run exits with code `1` and lists the failed days in its last log line. Re-run just those days with `--start`/`--end`. With the cache on, days that already succeeded aren't downloaded again. A large backfill can take many hours; see `docs/usage.md`.
+
+### `python: can't open file '/app/python'` or `No module named 'mlb'`
+
+Your image predates the Dockerfile fix that removed its `python` entrypoint and put `/app/src` on `PYTHONPATH`. Rebuild with `docker compose build`.
 
 ### pybaseball cache is stale
 
-The pipeline caches Statcast data under `data/cache/`. To clear it:
+Statcast backfills (runs with `--start`/`--end`) cache each day's download under `data/cache/pybaseball/` for a year. Catch-up runs don't use the cache. If you re-backfill a recent range to pick up Savant's revisions, clear the cache first:
 
 ```bash
-rm -rf data/cache/
+rm -rf data/cache/pybaseball/
 ```
 
 The next ingest will re-download data for the requested dates.

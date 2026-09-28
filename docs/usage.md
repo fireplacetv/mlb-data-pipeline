@@ -42,14 +42,24 @@ docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2024-0
 
 **Flags:**
 - `--start YYYY-MM-DD`: First date to pull (inclusive).
-- `--end YYYY-MM-DD`: Last date to pull (inclusive).
-- If neither flag is given, the pipeline catches up from the watermark (the last date with a completed load). See "Watermarks and incremental loading" below.
+- `--end YYYY-MM-DD`: Last date to pull (inclusive). Must be yesterday or earlier.
+- Give both flags or neither. With neither, the pipeline catches up from the watermark. See "Watermarks and Incremental Loading" below.
+
+**What a run does:**
+- Pulls one day at a time with `pybaseball.statcast()`, sleeping 2 seconds between days and retrying a failed day up to 3 times with backoff (5s, then 10s).
+- Skips days outside February 15 to November 15 without calling Savant, and skips days that return no pitches (off days, All-Star break).
+- If a day still fails after its retries, logs it, carries on with the remaining days, loads what it got, and exits with code `1` listing the failed days. Re-run those days with `--start`/`--end`.
+- Each run is **one dlt load**: running the same range twice appends a second copy of the rows with a new `_dlt_load_id`. Staging deduplicates (latest load wins).
+- Backfills (`--start`/`--end`) turn on the pybaseball cache in `data/cache/pybaseball/`, so re-running a failed backfill doesn't re-download the days that already succeeded. Catch-up runs never use the cache, so they always see Savant's latest revisions. Cached days don't expire for a year: if you re-backfill a recent range to pick up revisions, clear the cache first (see "Resetting").
 
 **Output:**
-- Parquet files land in `data/lake/raw_statcast/pitches/` (one file per day per load).
-- A load marker file in `data/lake/raw_statcast/_dlt_loads/` (one per completed load).
-- Updated schema in `schemas/export/dlt_statcast_schema.json` (committed to git).
-- Logs to stdout and `data/logs/statcast_<timestamp>.log`.
+- Parquet files in `data/lake/raw_statcast/pitches/`, named `<load_id>.<file_id>.parquet`. Every row carries `_dlt_load_id`.
+- One completed-load marker per load: `data/lake/raw_statcast/_dlt_loads/statcast__<load_id>.jsonl`. A load id without a marker didn't finish, and staging ignores its rows.
+- dlt's own tables next to them: `_dlt_pipeline_state/` (the synced watermark) and `_dlt_version/` (schema versions).
+- The dlt schema in `schemas/export/statcast.schema.yaml`. Commit it: a new, removed, or retyped column shows up as a git diff.
+- Logs to stdout and `data/logs/statcast_<timestamp>.log`: the watermark, the window, rows per day, schema changes (new tables, new columns, variant columns), rows loaded per table, duration per dlt step, and the new watermark.
+
+**Exit codes:** `0` success; `1` one or more days failed (the rest loaded); `2` refused to run (catch-up gap over `MAX_CATCHUP_DAYS`, or invalid flags).
 
 **Duration:** A few seconds for two days, minutes to hours for a season, depending on network and Savant responsiveness.
 
@@ -83,28 +93,35 @@ Each pipeline tracks a `loaded_through` date in dlt's source state. When you run
 
 **Lookback:** Recent games are revised by Savant for a few days after they're played. The lookback re-pulls those days to get the latest data. Keep `LOOKBACK_DAYS` small (default 4).
 
-**Manual backfill:** Use `--start` and `--end` to load any date range explicitly. A backfill that starts before the current watermark advances it; one that starts after it (a disconnected fill) leaves the watermark unchanged.
+**After the run:** the watermark moves to the last day before the first failed day (or to yesterday if none failed). It never moves backward, so a failure inside the lookback days leaves it where it was.
 
-**Resetting the watermark:** For development or if something goes wrong:
+**Manual backfill:** Use `--start` and `--end` to load any date range explicitly. A backfill moves the watermark to its end date only if every day succeeded **and** it connects to the watermark: it starts on or before `loaded_through + 1`, or no watermark exists yet (so a first backfill sets it). A disconnected backfill (starting after `loaded_through + 1`) still lands its data but leaves the watermark unchanged.
 
-```bash
-docker compose run --rm pipeline bash
-cd data/dlt_pipelines/
-ls -la  # See the pipeline directories
+**Where the watermark lives:** in dlt source state, saved with each load and synced to the lake (`data/lake/raw_statcast/_dlt_pipeline_state/`). `data/dlt_pipelines/` is only a local working copy: deleting it is safe, and the next run restores the watermark from the lake.
 
-# For Statcast:
-# Edit or delete statcast/1234567890.state.json to reset the watermark
-
-# For MLB API:
-# Edit or delete mlb_api/1234567890.state.json
-```
-
-Or blow it away entirely:
+**Printing the watermark:** every run logs it (`Watermark (loaded_through): ...`). To check without running:
 
 ```bash
-rm -rf data/dlt_pipelines/
-docker compose run --rm pipeline python -m mlb.pipelines.statcast  # First run again
+docker compose run --rm pipeline dlt pipeline --pipelines-dir /data/dlt_pipelines statcast info -v
 ```
+
+Look for `loaded_through` under `sources`. If `data/dlt_pipelines/` was deleted, restore it from the lake first:
+
+```bash
+docker compose run --rm -e DESTINATION__FILESYSTEM__BUCKET_URL=/data/lake pipeline \
+  dlt -y pipeline --pipelines-dir /data/dlt_pipelines statcast sync --destination filesystem --dataset-name raw_statcast
+```
+
+**Resetting the watermark:** deleting `data/dlt_pipelines/` does **not** reset it (it comes back from the lake). Drop it from state instead. This appends a new state record to the lake; no Parquet data is touched:
+
+```bash
+docker compose run --rm -e DESTINATION__FILESYSTEM__BUCKET_URL=/data/lake pipeline \
+  dlt -y pipeline --pipelines-dir /data/dlt_pipelines statcast drop --state-paths loaded_through --state-only
+```
+
+(The pipeline sets the lake path in code, so the `dlt` CLI needs it passed as `DESTINATION__FILESYSTEM__BUCKET_URL`.) The next run with no flags behaves like a first run: it loads the last `LOOKBACK_DAYS` days and sets a new watermark. To re-establish a watermark over existing history instead, run a backfill ending where you want it; a backfill with no watermark sets it.
+
+Never use `drop` without `--state-only`: on the filesystem destination it deletes the table's Parquet files from the lake.
 
 ---
 
@@ -202,8 +219,8 @@ To reproduce CI locally:
 
 ```bash
 docker compose build
-docker compose run --rm --entrypoint python pipeline -m mlb.pipelines.statcast --start 2025-09-01 --end 2025-09-01
-docker compose run --rm --entrypoint python pipeline -m mlb.pipelines.mlb_api --start 2025-09-01 --end 2025-09-01
+docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2025-09-01 --end 2025-09-01
+docker compose run --rm pipeline python -m mlb.pipelines.mlb_api --start 2025-09-01 --end 2025-09-01
 docker compose run --rm dbt run --empty
 docker compose run --rm dbt test
 ```
@@ -238,18 +255,17 @@ docker compose run --rm pipeline find data/lake -name "*.parquet" | wc -l
 ### Check load markers
 
 ```bash
-docker compose run --rm pipeline ls -la data/lake/raw_statcast/_dlt_loads/
-docker compose run --rm pipeline cat data/lake/raw_statcast/_dlt_loads/statcast_*.json | head -1
+ls -la data/lake/raw_statcast/_dlt_loads/
+head -1 data/lake/raw_statcast/_dlt_loads/statcast__*.jsonl
 ```
 
 ### Check the dlt watermark
 
 ```bash
-docker compose run --rm pipeline bash
-cd data/dlt_pipelines/statcast/
-ls -la  # Find the .state.json file
-cat 1234567890.state.json | python -m json.tool | grep loaded_through
+docker compose run --rm pipeline dlt pipeline --pipelines-dir /data/dlt_pipelines statcast info -v
 ```
+
+See "Watermarks and Incremental Loading" above for resetting it.
 
 ---
 
@@ -327,9 +343,8 @@ tail -100 dbt/logs/dbt.log
 ### Inspect the lake schema
 
 ```bash
-docker compose run --rm pipeline python -c \
-  "import json; schema = json.load(open('schemas/export/dlt_statcast_schema.json')); \
-  print(json.dumps(schema, indent=2))"
+cat schemas/export/statcast.schema.yaml
+git diff schemas/export/   # what changed in the last ingest
 ```
 
 ---
@@ -339,8 +354,10 @@ docker compose run --rm pipeline python -c \
 ### Clear pybaseball cache
 
 ```bash
-rm -rf data/cache/
+rm -rf data/cache/pybaseball/
 ```
+
+Only backfills use the cache. Clear it before re-backfilling a recent range to pick up Savant's revisions.
 
 ### Reset the warehouse only
 
@@ -350,11 +367,7 @@ rm -rf data/warehouse
 
 ### Reset pipeline state (watermarks)
 
-```bash
-rm -rf data/dlt_pipelines/
-```
-
-Next run will start fresh (and on first run, will ask you to backfill if no dates are given).
+Deleting `data/dlt_pipelines/` is safe but doesn't reset anything: state is restored from the lake on the next run. To reset a watermark, drop it from state as shown in "Watermarks and Incremental Loading".
 
 ### Reset everything (lake + warehouse + state)
 

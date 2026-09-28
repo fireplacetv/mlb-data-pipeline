@@ -174,12 +174,12 @@ The pybaseball README notes that Statcast data can change even for past seasons.
 - Write disposition: **`append` for every resource.** Don't use `replace`: on the filesystem destination it deletes the table's existing files, which breaks principle 1 and would drop earlier seasons. Staging deduplicates instead.
 - Each pipeline has its own `pipeline_name` and `dataset_name`. dlt syncs pipeline state to the destination (`_dlt_pipeline_state/`).
 - Set `pipelines_dir` to `<MLB_DATA_DIR>/dlt_pipelines`. Containers run with `--rm`, so dlt's home-directory default would be lost after every run.
-- Every row carries `_dlt_load_id`, which staging uses for deduplication.
+- Every row carries `_dlt_load_id`, which staging uses for deduplication. For DataFrame/Arrow input (Statcast), dlt only adds it with `[normalize.parquet_normalizer] add_dlt_load_id = true` in `.dlt/config.toml`.
 - Log row counts per resource after each run (from `load_info` / `pipeline.last_trace`).
 
 > **No merge on plain Parquet.** On the filesystem destination, `merge` silently falls back to `append`. That's intended here: staging deduplicates (§7.3).
 
-> **Completed-load markers.** On the filesystem destination, `_dlt_loads` is not a Parquet table. dlt writes one small JSON marker file per completed load into `<dataset>/_dlt_loads/`, named with the schema name and load id. A load id with no marker didn't finish, and staging ignores its rows. Inspect a real marker file before writing the SQL that parses it, because naming and compression vary by dlt version.
+> **Completed-load markers.** On the filesystem destination, `_dlt_loads` is not a Parquet table. dlt writes one small JSON marker file per completed load into `<dataset>/_dlt_loads/`, named with the schema name and load id. A load id with no marker didn't finish, and staging ignores its rows. Inspect a real marker file before writing the SQL that parses it, because naming and compression vary by dlt version. With dlt 1.30 the name is `<schema>__<load_id>.jsonl` (for example `raw_statcast/_dlt_loads/statcast__1790615044.628745.jsonl`).
 
 ### 6.3 Statcast pipeline — `src/mlb/pipelines/statcast.py`
 
@@ -187,11 +187,12 @@ The pybaseball README notes that Statcast data can change even for past seasons.
 - Runnable directly: `python -m mlb.pipelines.statcast [--start YYYY-MM-DD --end YYYY-MM-DD]` (a small `argparse` block under `if __name__ == "__main__":`). No flags means catch up since the last load (§6.6).
 - Resource `pitches`:
   - Calls `pybaseball.statcast(start_dt, end_dt)` **one day at a time** and yields one DataFrame per day. Skips empty days.
-  - Enables the pybaseball cache during backfills, stored under `<MLB_DATA_DIR>/cache` so it survives container restarts. Check pybaseball's cache config for how to set the directory.
-  - Declares dlt column hints only for key columns (`game_pk`, `game_date`, `batter`, `pitcher`, `at_bat_number`, `pitch_number`). Everything else is inferred (§6.5).
+  - Enables the pybaseball cache during backfills only, stored under `<MLB_DATA_DIR>/cache/pybaseball` (set via `pybaseball.cache.config.cache_directory`) so it survives container restarts. pybaseball caches date requests for a year, so catch-up runs never use the cache: they must see Savant's revisions.
+  - Declares dlt column hints only for key columns (`game_pk`, `game_date`, `batter`, `pitcher`, `at_bat_number`, `pitch_number`). Everything else is inferred (§6.5). Hints give only `data_type`, matching what pybaseball returns (dlt keeps a conflicting hint in the schema but doesn't convert DataFrame data, so a mismatched hint would misdescribe the files): the IDs are `bigint`, and `game_date` is `text`, because pybaseball's date parsing skips pandas 3 string columns. Staging casts it.
   - Natural key (documented, enforced in staging, not at load): `(game_pk, at_bat_number, pitch_number)`.
-- **Date windows:** chosen by the incremental rules in §6.6: catch-up by default, or an explicit `--start` / `--end` backfill. Either way the pipeline loads one day at a time and skips dates clearly outside a season (February 15 to November 15 as a default, so late-February spring training games are kept).
-- Be polite to Savant: sleep briefly between days during backfills and retry with backoff. A failed day is logged and skipped, and the run exits non-zero at the end listing the failed days.
+- **Date windows:** chosen by the incremental rules in §6.6: catch-up by default, or an explicit `--start` / `--end` backfill. Either way the pipeline loads one day at a time and skips dates clearly outside a season (February 15 to November 15 as a default, so late-February spring training games are kept). Note that `pybaseball.statcast()` applies its own season bounds: before March 15 for seasons after 2020 (and per-season dates through 2020), it returns nothing, so late-February games don't arrive through it today. Those days count as empty, not failed.
+- Be polite to Savant: sleep briefly between days and retry with backoff. A failed day is logged and skipped, and the run exits non-zero at the end listing the failed days.
+- Each run is one dlt load (all days in the window go into one load package), so re-running a range creates a second load that staging deduplicates.
 
 ### 6.4 MLB Stats API pipeline — `src/mlb/pipelines/mlb_api.py`
 
@@ -248,7 +249,9 @@ Runs are started by hand, so the pipelines must not assume they ran yesterday. E
 | No flags, watermark exists | `loaded_through − LOOKBACK_DAYS` through yesterday | Advanced to the last day before the first failed day (or to yesterday if none failed) |
 | No flags, no watermark (first run) | `yesterday − LOOKBACK_DAYS` through yesterday, with a warning suggesting a backfill | As above |
 | No flags, gap larger than `MAX_CATCHUP_DAYS` | Nothing. Exit non-zero and print the backfill command to run. | Unchanged |
-| `--start D1 --end D2` (backfill) | Exactly `D1` through `D2` | Advanced only if the range starts on or before `loaded_through + 1` and every day succeeded. A disconnected backfill doesn't move it. |
+| `--start D1 --end D2` (backfill) | Exactly `D1` through `D2` (`D2` no later than yesterday) | Advanced only if the range starts on or before `loaded_through + 1` (or no watermark exists yet) and every day succeeded. A disconnected backfill doesn't move it. |
+
+The watermark never moves backward: a failure inside the lookback days, or a backfill of older history, leaves it where it was.
 
 Defaults: `LOOKBACK_DAYS=4` (Savant revises recent games) and `MAX_CATCHUP_DAYS=30` (bigger gaps are deliberate backfills). Both are env vars.
 
@@ -262,7 +265,7 @@ Defaults: `LOOKBACK_DAYS=4` (Savant revises recent games) and `MAX_CATCHUP_DAYS=
 
 **Detecting gaps anyway:** a dbt test (§7.5) flags Final games that have no Statcast pitches, so a hole in the lake shows up in `dbt build` even if a watermark is wrong.
 
-**Inspecting and resetting:** `docs/usage.md` shows how to print each pipeline's watermark and how to reset it (for example with `dlt pipeline <name> drop` or by editing state), and explains what a reset triggers on the next run.
+**Inspecting and resetting:** `docs/usage.md` shows how to print each pipeline's watermark and how to reset it with `dlt pipeline <name> drop --state-paths loaded_through --state-only` (never without `--state-only`, which would delete lake files), and explains what a reset triggers on the next run. Deleting `data/dlt_pipelines/` doesn't reset anything: each run calls `pipeline.sync_destination()` before reading the watermark, which restores state from the lake.
 
 ---
 
@@ -360,7 +363,7 @@ select
 from deduped
 ```
 
-The column list is a starting point. Build the final list from the CSV docs and the columns actually present, and drop everything listed as deprecated. List columns explicitly rather than using `dbt_utils.star`, which needs a real relation and doesn't work on file-backed sources. dlt load ids are fixed-width Unix timestamps, so ordering them as strings gives load order.
+The column list is a starting point. Build the final list from the CSV docs and the columns actually present, and drop everything listed as deprecated. List columns explicitly rather than using `dbt_utils.star`, which needs a real relation and doesn't work on file-backed sources. dlt load ids are Unix timestamps with a fractional part (`1790615044.628745`). The integer part is fixed width (10 digits until 2286) and the fraction compares correctly as a string even though its length varies, so ordering them as strings gives load order.
 
 ### 7.4 Staging models
 

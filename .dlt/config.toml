@@ -1,5 +1,11 @@
 [runtime]
 log_level = "WARNING"
+# No anonymous usage telemetry: keeps runs (and tests) off the network.
+dlthub_telemetry = false
 
 [destination.filesystem]
 layout = "{table_name}/{load_id}.{file_id}.{ext}"
+
+# DataFrame/arrow rows don't get _dlt_load_id unless asked; staging dedups on it (§6.2).
+[normalize.parquet_normalizer]
+add_dlt_load_id = true
