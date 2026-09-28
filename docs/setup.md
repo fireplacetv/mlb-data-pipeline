@@ -81,7 +81,7 @@ Each ingest logs the date window, row counts, and duration. Data lands in `data/
 docker compose run --rm dbt build
 ```
 
-dbt reads the lake, deduplicates, casts types, and builds staging models in DuckDB (`data/warehouse/mlb.duckdb`). All tests run automatically. Logs go to `dbt/logs/`.
+dbt reads the lake, deduplicates, casts types, and builds staging models in DuckDB (`data/warehouse/mlb.duckdb`). All tests run automatically, and the last line should read `Done. PASS=... ERROR=0`. A `WARN` from `assert_final_games_have_pitches` means some Final games have no Statcast pitches; with the two days above it shouldn't appear. Logs go to `dbt/logs/`.
 
 ### 7. Verify success
 
@@ -92,7 +92,12 @@ docker compose run --rm pipeline python -c \
   "import duckdb; db = duckdb.connect('data/warehouse/mlb.duckdb', read_only=True); print(db.execute('SELECT * FROM information_schema.tables WHERE table_schema = \\'staging\\';').fetchall())"
 ```
 
-You should see tables like `stg_statcast__pitches`, `stg_mlb__games`, etc.
+You should see nine tables, such as `stg_statcast__pitches` and `stg_mlb__games`. To see row counts:
+
+```bash
+docker compose run --rm pipeline python -c \
+  "import duckdb; db = duckdb.connect('data/warehouse/mlb.duckdb', read_only=True); db.sql('select count(*) from staging.stg_statcast__pitches').show()"
+```
 
 ### 8. Run tests and linting
 

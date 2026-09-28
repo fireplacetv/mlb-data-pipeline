@@ -1,0 +1,32 @@
+sources:
+  - name: raw_mlb
+    description: >
+      MLB Stats API responses landed by the `mlb_api` dlt pipeline as append-only Parquet
+      (ARCHITECTURE.md §6.4). Nested JSON becomes child tables named `<parent>__<field>`.
+    # Matches the dlt dataset name, so on another warehouse source() resolves to real tables (§8).
+    schema: raw_mlb
+    meta:
+      # duckdb: dbt-duckdb reads the lake directly; union_by_name absorbs column drift (§6.5)
+      external_location: >
+        read_parquet('{{ env_var("MLB_DATA_DIR", "../data") }}/lake/raw_mlb/{name}/*.parquet',
+                     union_by_name = true)
+    tables:
+      - name: schedule
+        description: One row per scheduled game per daily load (`/api/v1/schedule`).
+      - name: boxscore__players
+        description: >
+          One row per player per Final game per load, from `/api/v1/game/{game_pk}/boxscore`.
+          The pipeline tags each row with game_pk, team_id, and side. Players who didn't bat
+          or pitch have null stats__batting__* / stats__pitching__* columns.
+      - name: standings__team_records
+        description: >
+          One row per team per standings snapshot (`/api/v1/standings`), tagged with the
+          as_of_date the pipeline requested.
+      - name: teams
+        description: One row per team per season snapshot (`/api/v1/teams`).
+      - name: rosters
+        description: >
+          One row per player on a team's 40-man roster per snapshot
+          (`/api/v1/teams/{team_id}/roster`), tagged with team_id and roster_date.
+      - name: people
+        description: One row per player bio fetched (`/api/v1/people`).

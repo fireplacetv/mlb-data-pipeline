@@ -162,9 +162,36 @@ Never use `drop` without `--state-only`: on the filesystem destination it delete
 docker compose run --rm dbt build
 ```
 
-Runs dbt in the container, reading from the lake and writing to the warehouse (`data/warehouse/mlb.duckdb`). All tests run automatically.
+Runs dbt in the container, reading from the lake and writing to the warehouse (`data/warehouse/mlb.duckdb`). All tests run automatically. The `dbt` service creates `data/warehouse/` first if it's missing, so the warehouse can be deleted at any time and rebuilt from the lake.
 
 **Duration:** Seconds to minutes, depending on how much data is in the lake.
+
+**What gets built** (all tables in the `staging` schema; SQL in `dbt/models/staging/`, descriptions in each folder's `_*__models.yml`):
+
+| Model | Built from | One row per | Key |
+|---|---|---|---|
+| `stg_dlt__completed_loads` | `_dlt_loads/` marker files in every lake dataset | completed dlt load | `dataset`, `load_id` |
+| `stg_statcast__pitches` | `raw_statcast/pitches` | pitch | `game_pk`, `at_bat_number`, `pitch_number` |
+| `stg_mlb__games` | `raw_mlb/schedule` | game | `game_pk` |
+| `stg_mlb__boxscore_batters` | `raw_mlb/boxscore__players` with batting stats | player × game | `game_pk`, `player_id` |
+| `stg_mlb__boxscore_pitchers` | `raw_mlb/boxscore__players` with pitching stats | player × game | `game_pk`, `player_id` |
+| `stg_mlb__standings` | `raw_mlb/standings__team_records` | team × as-of date | `team_id`, `as_of_date` |
+| `stg_mlb__teams` | `raw_mlb/teams` | team × season | `team_id`, `season` |
+| `stg_mlb__rosters` | `raw_mlb/rosters` | player × team × roster date | `player_id`, `team_id`, `roster_date` |
+| `stg_mlb__people` | `raw_mlb/people` | player | `player_id` |
+
+Every model keeps only rows whose `_dlt_load_id` has a completed-load marker (a load that crashed midway is ignored), then keeps the latest load's row for each key. Re-ingesting a range therefore never duplicates rows in staging. Staging doesn't join raw tables, aggregate, or filter by team or game type.
+
+**Tests** run as part of `dbt build`:
+- `not_null` on key columns, and uniqueness on each model's key.
+- Accepted values for Statcast `game_type` and `location_reference`, and boxscore `side`; accepted ranges for `launch_speed` (0–125) and `launch_angle` (-90 to 90).
+- `assert_staging_rows_match_distinct_raw_keys`: each model has exactly one row per distinct key among raw rows from completed loads, so deduplication is exact.
+- `assert_final_games_have_pitches` (warning only): Final regular-season and postseason games, up to the newest pitch date, with no Statcast pitches. A warning here means a hole in the Statcast lake; backfill the dates it lists.
+- Freshness (off by default): warns if the newest completed load is over 30 hours old and fails at 54 hours. Turn it on during the season:
+
+```bash
+docker compose run --rm dbt build --vars '{check_freshness: true}'
+```
 
 ### Build from scratch (full refresh)
 
@@ -178,7 +205,8 @@ Drops and rebuilds every model. Useful after major changes to the staging layer.
 
 ```bash
 docker compose run --rm dbt build --select stg_statcast__pitches
-docker compose run --rm dbt build --select tag:critical
+docker compose run --rm dbt build --select stg_mlb__games+          # a model and everything downstream of it
+docker compose run --rm dbt test --select assert_final_games_have_pitches   # one test
 ```
 
 See [dbt docs on selection](https://docs.getdbt.com/reference/node-selection/syntax).
@@ -241,7 +269,7 @@ docker compose run --rm pipeline ruff format .
 1. Writes `.env` from `.env.example` with `UID`/`GID` set to the runner user, so the container can write to the bind-mounted `data/`.
 2. Runs `docker compose build`.
 3. Runs both dlt pipelines against the live sources for one fixed day (`INGEST_START`/`INGEST_END` at the top of the workflow, currently `2025-09-01`). A pipeline whose module doesn't exist yet is skipped with a warning annotation.
-4. Runs `dbt run --empty` (builds every model with zero rows, which checks that the SQL compiles and runs against the real lake schemas) and then `dbt test`.
+4. Runs `dbt build` on that day's data, which checks the staging column lists and tests against real API responses (unit tests use hand-written fixtures).
 5. Uploads `data/logs/` and `dbt/logs/` as the `logs` artifact, even on failure.
 
 To reproduce CI locally:
@@ -250,8 +278,7 @@ To reproduce CI locally:
 docker compose build
 docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2025-09-01 --end 2025-09-01
 docker compose run --rm pipeline python -m mlb.pipelines.mlb_api --start 2025-09-01 --end 2025-09-01
-docker compose run --rm dbt run --empty
-docker compose run --rm dbt test
+docker compose run --rm dbt build
 ```
 
 ---

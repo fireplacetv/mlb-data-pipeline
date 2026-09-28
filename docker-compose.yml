@@ -22,5 +22,7 @@ services:
   dbt:
     <<: *mlb-base
     working_dir: /app/dbt
+    # DuckDB won't create a missing folder, so make data/warehouse first (it may have been
+    # deleted to rebuild from the lake), then hand the arguments to dbt.
+    entrypoint: ["sh", "-c", 'mkdir -p "$$MLB_DATA_DIR/warehouse" && exec dbt "$$@"', "dbt"]
     command: ["build"]
-    entrypoint: ["/opt/venv/bin/dbt"]

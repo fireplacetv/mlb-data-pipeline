@@ -141,8 +141,15 @@ mlb:
 
 Staging models all:
 - **Materialized as tables** (not views): fast to query, easy to rebuild.
-- **In the `staging` schema** (not the default `analytics`).
+- **In the `staging` schema.** `dbt/macros/generate_schema_name.sql` makes that the exact name; dbt's default would be `main_staging`.
 - **Have descriptions and tests** in their YAML.
+
+Other settings:
+- **`packages-install-path: /opt/dbt_packages`:** `dbt_utils` is installed into the image at build time, outside the bind-mounted repo, so no `dbt deps` is needed before `dbt build`.
+- **`flags: send_anonymous_usage_stats: false`:** no dbt telemetry.
+- **`vars: check_freshness: false`:** the recency tests on completed loads are off by default. Pass `--vars '{check_freshness: true}'` to turn them on (see `docs/usage.md`).
+
+**Sources** (`dbt/models/staging/*/_*__sources.yml`) read the lake directly with DuckDB's `read_parquet`, at `<MLB_DATA_DIR>/lake/<dataset>/<table>/*.parquet`. `stg_dlt__completed_loads` lists `<MLB_DATA_DIR>/lake/*/_dlt_loads/*`. Like `profiles.yml`, they read `MLB_DATA_DIR` (default `../data`, relative to `dbt/`).
 
 ---
 
@@ -187,6 +194,8 @@ environment:
 
 - **`MLB_DATA_DIR: /data`:** Inside the container, the bind-mounted `./data/` is at `/data`. Pipelines write there.
 - **`DBT_PROFILES_DIR` and `DBT_PROJECT_DIR`:** dbt looks here for `profiles.yml` and `dbt_project.yml`.
+
+The `dbt` service's entrypoint runs `mkdir -p "$MLB_DATA_DIR/warehouse"` and then `dbt` with your arguments (`build` when none are given). DuckDB won't create a missing folder for its database file, and `data/warehouse` is meant to be deletable.
 - **`TZ: America/Los_Angeles`:** For consistency (MLB games are in various US timezones, but most operations treat times as Pacific). Override if needed.
 
 You can add more variables to `.env` and they'll be picked up by `docker-compose.yml` automatically.

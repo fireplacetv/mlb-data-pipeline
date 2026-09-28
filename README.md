@@ -61,7 +61,7 @@ Data lands in `data/lake/` as Parquet files.
 docker compose run --rm dbt build
 ```
 
-Staging models land in DuckDB at `data/warehouse/mlb.duckdb`.
+Nine staging models land in the `staging` schema of DuckDB at `data/warehouse/mlb.duckdb`: typed, renamed, deduplicated (latest load wins), and limited to loads that finished. Every model is tested as it builds. `dbt build` reads only the lake, so you can delete `data/warehouse` and rebuild at any time. See [`docs/usage.md`](./docs/usage.md#transformation-and-dbt) for the model list.
 
 ### 6. Run tests and linting
 
