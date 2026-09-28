@@ -269,7 +269,7 @@ docker compose run --rm pipeline ruff format .
 1. Writes `.env` from `.env.example` with `UID`/`GID` set to the runner user, so the container can write to the bind-mounted `data/`.
 2. Runs `docker compose build`.
 3. Runs both dlt pipelines against the live sources for one fixed day (`INGEST_START`/`INGEST_END` at the top of the workflow, currently `2025-09-01`). A pipeline whose module doesn't exist yet is skipped with a warning annotation.
-4. Runs `dbt build` on that day's data, which checks the staging column lists and tests against real API responses (unit tests use hand-written fixtures).
+4. Runs `dbt run` and then `dbt test` on that day's data, which checks the staging column lists and tests against real API responses (unit tests use hand-written fixtures). They're separate steps so a model error and a test failure show up separately, and a failing test doesn't stop other models from building.
 5. Uploads `data/logs/` and `dbt/logs/` as the `logs` artifact, even on failure.
 
 To reproduce CI locally:
@@ -278,7 +278,8 @@ To reproduce CI locally:
 docker compose build
 docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2025-09-01 --end 2025-09-01
 docker compose run --rm pipeline python -m mlb.pipelines.mlb_api --start 2025-09-01 --end 2025-09-01
-docker compose run --rm dbt build
+docker compose run --rm dbt run
+docker compose run --rm dbt test
 ```
 
 ---

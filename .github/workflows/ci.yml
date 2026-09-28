@@ -53,9 +53,14 @@ jobs:
         run: echo "::warning::A dlt pipeline module is not implemented yet (M1/M2); its ingest step was skipped."
 
       # Builds and tests staging on the day just ingested, so the column lists and tests
-      # are checked against real responses, not only the recorded fixtures.
-      - name: dbt build
-        run: docker compose run --rm dbt build
+      # are checked against real responses, not only the recorded fixtures. Separate
+      # steps: model errors show up in `dbt run`, data test failures in `dbt test`, and a
+      # failing test doesn't stop other models from building.
+      - name: dbt run
+        run: docker compose run --rm dbt run
+
+      - name: dbt test
+        run: docker compose run --rm dbt test
 
       - name: Upload logs
         if: always()
