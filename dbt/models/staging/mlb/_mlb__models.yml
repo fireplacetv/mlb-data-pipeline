@@ -1,0 +1,201 @@
+models:
+  - name: stg_mlb__games
+    description: >
+      One row per game from the MLB schedule, from completed loads only, latest load
+      winning. A postponed game keeps its game_pk and reappears on its makeup date, so the
+      latest load gives its current date and status. Doubleheaders are two game_pks on one
+      game_date (game_number 1 and 2).
+    columns:
+      - name: game_pk
+        description: MLB game id.
+        data_tests: [not_null, unique]
+      - name: game_date
+        description: Official (local) date of the game (the API's `officialDate`).
+        data_tests: [not_null]
+      - name: scheduled_start_at
+        description: Scheduled first pitch (the API's `gameDate`, UTC).
+      - name: season
+        description: Season of the game.
+        data_tests: [not_null]
+      - name: game_type
+        description: >
+          MLB game type code, for example R = regular season, F/D/L/W = postseason rounds,
+          S = spring training, E = exhibition, A = All-Star.
+        data_tests: [not_null]
+      - name: double_header
+        description: N = not a doubleheader, Y = traditional, S = split (separate admission).
+      - name: game_number
+        description: 1, or 2 for the second game of a doubleheader.
+      - name: coded_game_state
+        description: >
+          Game status code. F = Final and O = Game Over mark a finished game; D (postponed)
+          and C (cancelled) also report abstract_game_state = Final, so use this column.
+        data_tests: [not_null]
+      - name: abstract_game_state
+        description: Preview, Live, or Final. Postponed and cancelled games are also Final.
+      - name: detailed_state
+        description: Human-readable status, for example `Final` or `Postponed`.
+      - name: home_team_id
+        description: MLB team id of the home team.
+        data_tests: [not_null]
+      - name: away_team_id
+        description: MLB team id of the away team.
+        data_tests: [not_null]
+      - name: home_wins
+        description: Home team's wins as reported in the schedule for this game.
+      - name: _dlt_load_id
+        description: The dlt load this row came from.
+        data_tests: [not_null]
+
+  - name: stg_mlb__boxscore_batters
+    description: >
+      One row per player per Final game for players with batting stats in the boxscore,
+      from completed loads only, latest load winning. A two-way player appears here and in
+      stg_mlb__boxscore_pitchers.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [game_pk, player_id]
+    columns:
+      - name: game_pk
+        description: MLB game id.
+        data_tests: [not_null]
+      - name: player_id
+        description: MLB player id.
+        data_tests: [not_null]
+      - name: team_id
+        description: MLB team id the player played for in this game.
+        data_tests: [not_null]
+      - name: side
+        description: away or home.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [away, home]
+      - name: batting_order
+        description: >
+          The API's batting-order code, kept as text: the first digit is the lineup slot and
+          the rest counts substitutes in that slot (100 = leadoff starter, 101 = first sub).
+      - name: summary
+        description: The API's line summary, for example `2-4, HR, 2 RBI`.
+      - name: _dlt_load_id
+        description: The dlt load this row came from.
+        data_tests: [not_null]
+
+  - name: stg_mlb__boxscore_pitchers
+    description: >
+      One row per player per Final game for players with pitching stats in the boxscore,
+      from completed loads only, latest load winning.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [game_pk, player_id]
+    columns:
+      - name: game_pk
+        description: MLB game id.
+        data_tests: [not_null]
+      - name: player_id
+        description: MLB player id.
+        data_tests: [not_null]
+      - name: team_id
+        description: MLB team id the player pitched for in this game.
+        data_tests: [not_null]
+      - name: side
+        description: away or home.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [away, home]
+      - name: innings_pitched
+        description: >
+          Innings pitched in baseball notation, kept as text: `6.1` means six and one third
+          innings, not 6.1.
+      - name: _dlt_load_id
+        description: The dlt load this row came from.
+        data_tests: [not_null]
+
+  - name: stg_mlb__standings
+    description: >
+      One row per team per standings snapshot. The pipeline takes one snapshot per run, as
+      of the run window's end date, so there isn't a row for every day. From completed
+      loads only, latest load winning.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [team_id, as_of_date]
+    columns:
+      - name: team_id
+        description: MLB team id.
+        data_tests: [not_null]
+      - name: as_of_date
+        description: The date the standings were requested for.
+        data_tests: [not_null]
+      - name: winning_percentage
+        description: Wins divided by games with a decision (the API sends text like `.565`).
+      - name: games_back
+        description: Games behind the division leader, as text (`-` for the leader).
+      - name: _dlt_load_id
+        description: The dlt load this row came from.
+        data_tests: [not_null]
+
+  - name: stg_mlb__teams
+    description: >
+      One row per team per season, from completed loads only, latest snapshot winning.
+      Team abbreviations are the MLB API's and don't always match Savant's.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [team_id, season]
+    columns:
+      - name: team_id
+        description: MLB team id.
+        data_tests: [not_null]
+      - name: season
+        description: Season of the snapshot.
+        data_tests: [not_null]
+      - name: team_full_name
+        description: Full name, for example `San Francisco Giants` (the API's `name`).
+      - name: _dlt_load_id
+        description: The dlt load this row came from.
+        data_tests: [not_null]
+
+  - name: stg_mlb__rosters
+    description: >
+      One row per player on a team's 40-man roster per roster snapshot. The pipeline takes
+      one snapshot per run, as of the run window's end date. From completed loads only,
+      latest load winning.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [player_id, team_id, roster_date]
+    columns:
+      - name: player_id
+        description: MLB player id.
+        data_tests: [not_null]
+      - name: team_id
+        description: MLB team id of the roster.
+        data_tests: [not_null]
+      - name: roster_date
+        description: The date the roster was requested for.
+        data_tests: [not_null]
+      - name: _dlt_load_id
+        description: The dlt load this row came from.
+        data_tests: [not_null]
+
+  - name: stg_mlb__people
+    description: >
+      One row per player bio. Bios are fetched once per player id (existing bios aren't
+      refreshed), from completed loads only, latest load winning.
+    columns:
+      - name: player_id
+        description: MLB player id.
+        data_tests: [not_null, unique]
+      - name: bat_side
+        description: L, R, or S (switch).
+      - name: pitch_hand
+        description: L or R.
+      - name: _dlt_load_id
+        description: The dlt load this row came from.
+        data_tests: [not_null]

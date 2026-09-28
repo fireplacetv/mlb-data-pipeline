@@ -52,8 +52,12 @@ jobs:
         if: hashFiles('src/mlb/pipelines/statcast.py') == '' || hashFiles('src/mlb/pipelines/mlb_api.py') == ''
         run: echo "::warning::A dlt pipeline module is not implemented yet (M1/M2); its ingest step was skipped."
 
-      - name: dbt run --empty
-        run: docker compose run --rm dbt run --empty
+      # Builds and tests staging on the day just ingested, so the column lists and tests
+      # are checked against real responses, not only the recorded fixtures. Separate
+      # steps: model errors show up in `dbt run`, data test failures in `dbt test`, and a
+      # failing test doesn't stop other models from building.
+      - name: dbt run
+        run: docker compose run --rm dbt run
 
       - name: dbt test
         run: docker compose run --rm dbt test

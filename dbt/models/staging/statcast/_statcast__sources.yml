@@ -1,0 +1,18 @@
+sources:
+  - name: raw_statcast
+    description: >
+      Statcast pitches landed by the `statcast` dlt pipeline as append-only Parquet
+      (ARCHITECTURE.md §6.3). Every load appends; staging keeps completed loads only
+      and deduplicates (latest load wins).
+    # Matches the dlt dataset name, so on another warehouse source() resolves to real tables (§8).
+    schema: raw_statcast
+    meta:
+      # duckdb: dbt-duckdb reads the lake directly; union_by_name absorbs column drift (§6.5)
+      external_location: >
+        read_parquet('{{ env_var("MLB_DATA_DIR", "../data") }}/lake/raw_statcast/{name}/*.parquet',
+                     union_by_name = true)
+    tables:
+      - name: pitches
+        description: >
+          One row per pitch per load, as returned by pybaseball.statcast() (the Savant
+          Statcast Search CSV). Natural key: game_pk, at_bat_number, pitch_number.

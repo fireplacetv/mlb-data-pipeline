@@ -1,0 +1,117 @@
+models:
+  - name: stg_statcast__pitches
+    description: >
+      One row per pitch from Baseball Savant's Statcast Search export, from completed loads
+      only, latest load winning when a pitch was loaded more than once. Columns are typed and
+      follow the Savant CSV docs (https://baseballsavant.mlb.com/csv-docs), minus the
+      deprecated ones (spin_dir, spin_rate_deprecated, break_angle_deprecated,
+      break_length_deprecated, tfs_deprecated, tfs_zulu_deprecated, umpire).
+
+      A row is a pitch, not a plate appearance: `events` is only populated on the last
+      pitch of a plate appearance. Team abbreviations are Savant's and don't always match
+      the MLB Stats API's.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [game_pk, at_bat_number, pitch_number]
+    columns:
+      - name: game_pk
+        description: MLB game id. Identifies a game (doubleheaders share a game_date).
+        data_tests: [not_null]
+      - name: game_date
+        description: Local date of the game.
+        data_tests: [not_null]
+      - name: game_year
+        description: Season of the game.
+      - name: game_type
+        description: >
+          E = exhibition, S = spring training, R = regular season, F = wild card,
+          D = division series, L = league championship series, W = World Series.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [E, S, R, F, D, L, W]
+      - name: at_bat_number
+        description: Plate appearance number within the game.
+        data_tests: [not_null]
+      - name: pitch_number
+        description: Pitch number within the plate appearance.
+        data_tests: [not_null]
+      - name: batter_id
+        description: MLB player id of the batter (Savant's `batter`).
+        data_tests: [not_null]
+      - name: pitcher_id
+        description: MLB player id of the pitcher (Savant's `pitcher`).
+        data_tests: [not_null]
+      - name: player_name
+        description: >
+          Name of one player in the matchup, depending on the Savant search (the pitcher for
+          pybaseball.statcast()). Use batter_id and pitcher_id to identify players.
+      - name: on_1b_id
+        description: Player id of the runner on first base, if any (Savant's `on_1b`; same for on_2b_id, on_3b_id).
+      - name: fielder_2_id
+        description: Player id of the catcher (Savant's `fielder_2`; fielder_3_id to fielder_9_id follow scoring positions).
+      - name: plate_x
+        description: >
+          Horizontal pitch location (feet, catcher's view). Measured at the front of the
+          plate through 2025 and at the middle of the plate from 2026; see location_reference.
+      - name: plate_z
+        description: Vertical pitch location (feet). Same measurement change as plate_x.
+      - name: sz_top
+        description: >
+          Top of the strike zone (feet). Operator-set through 2025; the batter's ABS-defined
+          zone from 2026.
+      - name: sz_bot
+        description: Bottom of the strike zone (feet). Same change as sz_top.
+      - name: location_reference
+        description: >
+          Where plate_x / plate_z are measured: `front_of_plate` through 2025,
+          `middle_of_plate` from 2026 (per the Savant CSV docs).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [front_of_plate, middle_of_plate]
+      - name: pitch_result_type
+        description: Savant's `type`. B = ball, S = strike (including fouls), X = ball in play.
+      - name: description
+        description: Result of the pitch, for example `called_strike` or `hit_into_play`.
+      - name: events
+        description: Plate-appearance outcome. Only populated on the last pitch of a plate appearance.
+      - name: play_description
+        description: Text description of the play (Savant's `des`).
+      - name: launch_speed
+        description: Exit velocity of the batted ball (mph).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 125
+              config:
+                where: "launch_speed is not null"
+      - name: launch_angle
+        description: Launch angle of the batted ball (degrees).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -90
+                max_value: 90
+              config:
+                where: "launch_angle is not null"
+      - name: launch_speed_angle
+        description: >
+          Batted-ball quality class from exit velocity and launch angle: 1 = weak,
+          2 = topped, 3 = under, 4 = flare/burner, 5 = solid contact, 6 = barrel.
+      - name: xba
+        description: Expected batting average from exit velocity and launch angle (estimated_ba_using_speedangle).
+      - name: xwoba
+        description: Expected wOBA from exit velocity and launch angle (estimated_woba_using_speedangle).
+      - name: xslg
+        description: Expected slugging from exit velocity and launch angle (estimated_slg_using_speedangle).
+      - name: woba_value
+        description: wOBA value of the plate-appearance outcome (last pitch only).
+      - name: woba_denom
+        description: 1 if the plate appearance counts in the wOBA denominator (last pitch only).
+      - name: _dlt_load_id
+        description: The dlt load this row came from (the latest completed load for the pitch).
+        data_tests: [not_null]

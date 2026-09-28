@@ -299,7 +299,7 @@ mlb:
       threads: 4
 ```
 
-`dbt_project.yml`: all staging models `materialized: table`, schema `staging`, and `packages-install-path: /opt/dbt_packages` so installed packages live outside the bind-mounted repo (§9). At this data size (a few million pitches per season) a full rebuild takes seconds to minutes, and it avoids incremental-logic bugs. Revisit incremental only if rebuilds become slow.
+`dbt_project.yml`: all staging models `materialized: table`, schema `staging`, and `packages-install-path: /opt/dbt_packages` so installed packages live outside the bind-mounted repo (§9). A `generate_schema_name` override in `dbt/macros/` makes the schema exactly `staging` (dbt's default would be `main_staging`). dbt's anonymous usage stats are off (`flags: send_anonymous_usage_stats: false`), like dlt's telemetry. At this data size (a few million pitches per season) a full rebuild takes seconds to minutes, and it avoids incremental-logic bugs. Revisit incremental only if rebuilds become slow.
 
 Sources point at the lake through dbt-duckdb's `external_location`. Each source's `schema` matches the dlt dataset name, so on another warehouse the same `source()` calls would resolve to real tables (§8):
 
@@ -316,11 +316,13 @@ sources:
       - name: pitches
 ```
 
-`union_by_name = true` matters because columns drift across seasons (§6.5). Verify that `env_var()` renders inside source `meta` in the installed dbt version. If not, use a `vars` path or a macro.
+`union_by_name = true` matters because columns drift across seasons (§6.5). `env_var()` renders inside source `meta` (verified with dbt-core 1.12 and dbt-duckdb 1.11).
+
+DuckDB won't create a missing parent folder for the database file, so the Compose `dbt` service runs `mkdir -p "$MLB_DATA_DIR/warehouse"` before `dbt` (§9). That keeps "delete `data/warehouse`, then `dbt build`" working.
 
 ### 7.3 The staging pattern
 
-Every staging model over an append-only raw table follows this shape. Deduplication uses `dbt_utils.deduplicate`, which generates the right SQL for each adapter and accepts a CTE name:
+Every staging model over an append-only raw table follows this shape. Deduplication is a standard-SQL `row_number()` window, which runs unchanged on DuckDB and Postgres. Don't use `dbt_utils.deduplicate`: it has no DuckDB implementation, and its default one natural-joins on every column, which silently drops any row with a null in any column (most Statcast rows).
 
 ```sql
 -- models/staging/statcast/stg_statcast__pitches.sql
@@ -337,41 +339,44 @@ raw_rows as (
         on r._dlt_load_id = l.load_id
 ),
 
+ranked as (
+    select
+        *,
+        row_number() over (
+            partition by game_pk, at_bat_number, pitch_number
+            order by _dlt_load_id desc
+        ) as load_rank
+    from raw_rows
+),
+
 deduped as (
-    {{ dbt_utils.deduplicate(
-        relation='raw_rows',
-        partition_by='game_pk, at_bat_number, pitch_number',
-        order_by='_dlt_load_id desc'
-    ) }}
+    select *
+    from ranked
+    where load_rank = 1
+),
+
+renamed as (
+    select
+        cast(game_pk as integer)                as game_pk,
+        cast(game_date as date)                 as game_date,
+        cast(batter as integer)                 as batter_id,
+        cast(type as varchar)                   as pitch_result_type,
+        cast(release_speed as double precision) as release_speed,
+        -- ... every other non-deprecated column, each cast explicitly
+        case
+            when cast(game_year as integer) >= 2026 then 'middle_of_plate'
+            else 'front_of_plate'
+        end                                     as location_reference,
+        cast(_dlt_load_id as varchar)           as _dlt_load_id
+    from deduped
 )
 
-select
-    cast(game_pk as integer)            as game_pk,
-    cast(game_date as date)             as game_date,
-    cast(game_year as integer)          as game_year,
-    game_type,
-    cast(at_bat_number as integer)      as at_bat_number,
-    cast(pitch_number as integer)       as pitch_number,
-    cast(batter as integer)             as batter_id,
-    cast(pitcher as integer)            as pitcher_id,
-    inning, inning_topbot, home_team, away_team, stand, p_throws,
-    balls, strikes, outs_when_up,
-    pitch_type, pitch_name, release_speed, release_spin_rate, release_extension,
-    pfx_x, pfx_z, plate_x, plate_z, zone, sz_top, sz_bot,
-    type as pitch_result_type,
-    description, events, des as play_description, bb_type,
-    launch_speed, launch_angle, launch_speed_angle, hit_distance_sc,
-    estimated_ba_using_speedangle       as xba,
-    estimated_woba_using_speedangle     as xwoba,
-    woba_value, woba_denom, babip_value, iso_value,
-    case when cast(game_year as integer) >= 2026
-         then 'middle_of_plate' else 'front_of_plate'
-    end                                 as location_reference,
-    _dlt_load_id
-from deduped
+select * from renamed
 ```
 
-The column list is a starting point. Build the final list from the CSV docs and the columns actually present, and drop everything listed as deprecated. List columns explicitly rather than using `dbt_utils.star`, which needs a real relation and doesn't work on file-backed sources. dlt load ids are Unix timestamps with a fractional part (`1790615044.628745`). The integer part is fixed width (10 digits until 2286) and the fraction compares correctly as a string even though its length varies, so ordering them as strings gives load order.
+Every column is cast explicitly, with standard type names (`integer`, `double precision`, `varchar`, `date`, `timestamp with time zone`, `boolean`) that DuckDB and Postgres both accept. Physical measurements are `double precision` even where Savant sends whole numbers, so a future decimal is never truncated. Values in baseball notation (innings pitched `6.1`, games back `-`) stay text. The Statcast model keeps every column in the CSV docs except the deprecated ones (§11). List columns explicitly rather than using `dbt_utils.star`, which needs a real relation and doesn't work on file-backed sources.
+
+MLB API models select only fields the API sends for every row. Fields that appear only on some games (for example `status.reason`, present only on postponed games) would be missing from every file of a day without such a game, and `dbt build` would fail. dlt load ids are Unix timestamps with a fractional part (`1790615044.628745`). The integer part is fixed width (10 digits until 2286) and the fraction compares correctly as a string even though its length varies, so ordering them as strings gives load order.
 
 ### 7.4 Staging models
 
@@ -389,6 +394,8 @@ The column list is a starting point. Build the final list from the CSV docs and 
 
 `stg_dlt__completed_loads` also exposes `loaded_at` (the load id converted to a timestamp) for the recency test.
 
+Boxscore batters and pitchers are the `boxscore__players` rows whose `stats__batting__games_played` (or `stats__pitching__games_played`) is not null: the API sends an empty stats object for a player who didn't bat (or pitch). A two-way player appears in both.
+
 Raw child-table names come from dlt's normalization (§6.4). As of M2: `boxscore__players` holds one row per player per game, with `game_pk`, `team_id`, `side`, `person__id`, and the game's stats flattened into `stats__batting__*` / `stats__pitching__*` columns (a player who didn't bat or pitch has nulls there). `standings__team_records` holds one row per team with `as_of_date` and `team__id`. Both carry `_dlt_load_id`. Other boxscore child tables (`boxscore__teams__{away,home}__{batters,pitchers,batting_order,info}`, `boxscore__officials`, `boxscore__info`, `boxscore__players__all_positions`) have no staging model in this plan. Check `schemas/export/mlb_api.schema.yaml` after a live run before writing the models.
 
 ### 7.5 Tests
@@ -398,10 +405,10 @@ Use `dbt_utils` generic tests where one fits, and singular SQL tests only where 
 - Every model: `not_null` on its key columns, plus `unique` or `dbt_utils.unique_combination_of_columns` on its grain.
 - `accepted_values` on `game_type` (codes from the Savant CSV docs) and `location_reference`.
 - `dbt_utils.accepted_range` on `launch_angle` (-90 to 90) and `launch_speed` (0 to 125), with `where: "... is not null"`.
-- `dbt_utils.recency` on `stg_dlt__completed_loads.loaded_at`: severity `warn` at 30 hours and `error` at 54 hours. **Off by default** (var `check_freshness: false`), so offseason builds and CI's fixture data don't fail. Turn it on during the season with `dbt build --vars '{check_freshness: true}'`.
+- `dbt_utils.recency` on `stg_dlt__completed_loads.loaded_at`: severity `warn` at 30 hours and `error` at 54 hours (two tests, `completed_loads_recent_warn` and `completed_loads_recent_error`). **Off by default** (var `check_freshness: false`, which sets each test's `enabled`), so offseason builds and CI's fixture data don't fail. Turn it on during the season with `dbt build --vars '{check_freshness: true}'`.
 - Singular tests in `dbt/tests/`:
-  - Staging row count equals the distinct natural-key count among raw rows from completed loads, which proves dedup is exact.
-  - Gap check (severity `warn`): games in `stg_mlb__games` with status Final and a regular-season or postseason `game_type`, dated on or before the newest pitch date, that have no rows in `stg_statcast__pitches`.
+  - `assert_staging_rows_match_distinct_raw_keys`: for every model, staging row count equals the distinct natural-key count among raw rows from completed loads, which proves dedup is exact.
+  - `assert_final_games_have_pitches`, a gap check (severity `warn`): games in `stg_mlb__games` with status Final and a regular-season or postseason `game_type`, dated on or before the newest pitch date, that have no rows in `stg_statcast__pitches`.
 
 ---
 
@@ -410,7 +417,7 @@ Use `dbt_utils` generic tests where one fits, and singular SQL tests only where 
 DuckDB is the warehouse. Postgres, or another warehouse, is a possibility to keep in mind, not a planned phase. The goal is that a move would mean **some code changes in the dbt layer, not a redesign**. Avoiding every DuckDB-specific line isn't a goal.
 
 **Guidelines:**
-1. **Prefer `dbt_utils` and dbt's cross-database macros when they're as simple as the native SQL.** Today that's `deduplicate`, `unique_combination_of_columns`, `accepted_range`, and `recency`, plus `dbt.type_*` casts where a type differs across warehouses.
+1. **Prefer `dbt_utils`, dbt's cross-database macros, and standard SQL when they're as simple as the native SQL.** Today that's `unique_combination_of_columns`, `accepted_range`, and `recency`, deduplication with a standard `row_number()` window (§7.3), and standard type names in casts (`double precision`, not DuckDB's `double`).
 2. **DuckDB-specific SQL is fine where it's the simplest option.** Examples are `read_parquet` in source config and `glob()` over load markers in `stg_dlt__completed_loads`. Keep it in the places that need it and add a one-line comment. Don't wrap it in dispatch macros or add adapter branches ahead of time.
 3. **Keep the design choices that make a move cheap:** the lake as system of record, source `schema` names that match dlt dataset names, and staging models that each read one raw table.
 4. **Lowercase snake_case identifiers everywhere.**
@@ -460,7 +467,9 @@ services:
   dbt:                # raw dbt: docker compose run --rm dbt build --select staging
     <<: *mlb-base
     working_dir: /app/dbt
-    entrypoint: ["dbt"]
+    # DuckDB won't create a missing folder, so make data/warehouse first (§7.2).
+    entrypoint: ["sh", "-c", 'mkdir -p "$$MLB_DATA_DIR/warehouse" && exec dbt "$$@"', "dbt"]
+    command: ["build"]
 ```
 
 **Rules:**
@@ -490,7 +499,7 @@ services:
 
 Each pipeline module exits non-zero on failure and logs to stdout and `data/logs/`, with per-step durations and row counts.
 
-**CI (GitHub Actions, on PR and on push to `main`):** `.github/workflows/ci.yml` builds the same image with `docker compose build`, runs both dlt pipelines against the live sources for one fixed day (`2025-09-01`), then runs `dbt run --empty` and `dbt test`. A pipeline whose module doesn't exist yet is skipped with a warning, so the workflow is usable from M0. Logs from `data/logs/` and `dbt/logs/` are uploaded as an artifact. Planned for M4: add `ruff check`, `ruff format --check`, `pytest`, and a `dbt build` against the fixture lake. That job copies `tests/fixtures/lake/` into `lake/` under a temporary directory and sets `MLB_DATA_DIR` to that directory, so the warehouse never lands inside `tests/`. The fixture lake covers one date and includes a duplicate pitch across two loads, an incomplete load with no marker file, and a doubleheader.
+**CI (GitHub Actions, on PR and on push to `main`):** `.github/workflows/ci.yml` builds the same image with `docker compose build`, runs both dlt pipelines against the live sources for one fixed day (`2025-09-01`), then runs `dbt run` and `dbt test` on that day's data (separate steps, so model errors and test failures show up separately and a failing test doesn't block other models), which checks the staging column lists and tests against real responses. A pipeline whose module doesn't exist yet is skipped with a warning, so the workflow is usable from M0. Logs from `data/logs/` and `dbt/logs/` are uploaded as an artifact. Planned for M4: add `ruff check`, `ruff format --check`, `pytest`, and a `dbt build` against the fixture lake. That job copies `tests/fixtures/lake/` into `lake/` under a temporary directory and sets `MLB_DATA_DIR` to that directory, so the warehouse never lands inside `tests/`. The fixture lake covers one date and includes a duplicate pitch across two loads, an incomplete load with no marker file, and a doubleheader.
 
 ### 9.1 Documentation (`docs/`)
 

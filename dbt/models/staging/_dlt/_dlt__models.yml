@@ -1,0 +1,46 @@
+models:
+  - name: stg_dlt__completed_loads
+    description: >
+      One row per dlt load that finished, across every dataset in the lake. dlt writes a
+      marker file into `<dataset>/_dlt_loads/` only when a load completes, so a load id
+      without one didn't finish. Every other staging model inner-joins to this to drop
+      rows from unfinished loads.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [dataset, load_id]
+      # Freshness: off by default (offseason, fixture data); in season run
+      # dbt build --vars '{check_freshness: true}'. Warn at 30 hours, error at 54.
+      - dbt_utils.recency:
+          name: completed_loads_recent_warn
+          arguments:
+            datepart: hour
+            field: loaded_at
+            interval: 30
+          config:
+            enabled: "{{ var('check_freshness') | as_bool }}"
+            severity: warn
+      - dbt_utils.recency:
+          name: completed_loads_recent_error
+          arguments:
+            datepart: hour
+            field: loaded_at
+            interval: 54
+          config:
+            enabled: "{{ var('check_freshness') | as_bool }}"
+            severity: error
+    columns:
+      - name: dataset
+        description: dlt dataset (lake folder), for example `raw_statcast` or `raw_mlb`.
+        data_tests: [not_null]
+      - name: schema_name
+        description: dlt schema name of the pipeline that wrote the load (`statcast`, `mlb_api`).
+        data_tests: [not_null]
+      - name: load_id
+        description: >
+          dlt load id, a Unix timestamp with a fractional part as text. Matches
+          `_dlt_load_id` on raw rows. Sorting as text gives load order.
+        data_tests: [not_null]
+      - name: loaded_at
+        description: The load id converted to a timestamp (when the load started).
+        data_tests: [not_null]
