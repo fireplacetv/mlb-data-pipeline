@@ -1,0 +1,139 @@
+{
+  "copyright": "Copyright 2025 MLB Advanced Media, L.P.  Use of any content on this page acknowledges agreement to the terms posted here http://gdx.mlb.com/components/copyright.txt",
+  "records": [
+    {
+      "standingsType": "regularSeason",
+      "league": {
+        "id": 104,
+        "link": "/api/v1/league/104"
+      },
+      "division": {
+        "id": 203,
+        "link": "/api/v1/divisions/203"
+      },
+      "sport": {
+        "id": 1,
+        "link": "/api/v1/sports/1"
+      },
+      "lastUpdated": "2025-09-03T04:12:31.456Z",
+      "teamRecords": [
+        {
+          "team": {
+            "id": 119,
+            "name": "Los Angeles Dodgers",
+            "link": "/api/v1/teams/119"
+          },
+          "season": "2025",
+          "streak": {
+            "streakCode": "W2",
+            "streakType": "wins",
+            "streakNumber": 2
+          },
+          "divisionRank": "1",
+          "leagueRank": "2",
+          "sportRank": "4",
+          "gamesPlayed": 138,
+          "gamesBack": "-",
+          "wildCardGamesBack": "-",
+          "leagueGamesBack": "-",
+          "sportGamesBack": "-",
+          "divisionGamesBack": "-",
+          "conferenceGamesBack": "-",
+          "leagueRecord": {
+            "wins": 78,
+            "losses": 60,
+            "ties": 0,
+            "pct": ".565"
+          },
+          "lastUpdated": "2025-09-03T04:12:31.456Z",
+          "records": {
+            "splitRecords": [
+              {
+                "wins": 39,
+                "losses": 30,
+                "type": "home",
+                "pct": ".550"
+              },
+              {
+                "wins": 39,
+                "losses": 30,
+                "type": "away",
+                "pct": ".540"
+              }
+            ]
+          },
+          "runsAllowed": 560,
+          "runsScored": 640,
+          "divisionChamp": false,
+          "divisionLeader": true,
+          "hasWildcard": true,
+          "clinched": false,
+          "eliminationNumber": "-",
+          "wildCardEliminationNumber": "-",
+          "wins": 78,
+          "losses": 60,
+          "runDifferential": 80,
+          "winningPercentage": ".565"
+        },
+        {
+          "team": {
+            "id": 137,
+            "name": "San Francisco Giants",
+            "link": "/api/v1/teams/137"
+          },
+          "season": "2025",
+          "streak": {
+            "streakCode": "W2",
+            "streakType": "wins",
+            "streakNumber": 2
+          },
+          "divisionRank": "2",
+          "leagueRank": "3",
+          "sportRank": "5",
+          "gamesPlayed": 138,
+          "gamesBack": "8.0",
+          "wildCardGamesBack": "-",
+          "leagueGamesBack": "8.0",
+          "sportGamesBack": "8.0",
+          "divisionGamesBack": "8.0",
+          "conferenceGamesBack": "-",
+          "leagueRecord": {
+            "wins": 70,
+            "losses": 68,
+            "ties": 0,
+            "pct": ".507"
+          },
+          "lastUpdated": "2025-09-03T04:12:31.456Z",
+          "records": {
+            "splitRecords": [
+              {
+                "wins": 35,
+                "losses": 34,
+                "type": "home",
+                "pct": ".550"
+              },
+              {
+                "wins": 35,
+                "losses": 34,
+                "type": "away",
+                "pct": ".540"
+              }
+            ]
+          },
+          "runsAllowed": 560,
+          "runsScored": 640,
+          "divisionChamp": false,
+          "divisionLeader": false,
+          "hasWildcard": true,
+          "clinched": false,
+          "eliminationNumber": "-",
+          "wildCardEliminationNumber": "-",
+          "wins": 70,
+          "losses": 68,
+          "runDifferential": 80,
+          "winningPercentage": ".507"
+        }
+      ]
+    }
+  ]
+}

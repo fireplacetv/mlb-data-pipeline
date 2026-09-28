@@ -65,21 +65,50 @@ docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2024-0
 
 ### Ingest MLB Stats API
 
+Catch up since the last load (incremental):
+
 ```bash
 docker compose run --rm pipeline python -m mlb.pipelines.mlb_api
 ```
 
-Or backfill:
+Backfill a specific date range:
 
 ```bash
 docker compose run --rm pipeline python -m mlb.pipelines.mlb_api --start 2024-06-01 --end 2024-09-30
 ```
 
+**Flags:** the same as Statcast: `--start` and `--end` together for a backfill, neither for a catch-up. The watermark is separate from Statcast's.
+
+**What a run does:** several dlt loads, in this order:
+
+1. **One load per day** (days outside February 15 to November 15 are skipped): the day's `schedule` (one row per game, including postponed ones) and the `boxscore` of each game that is Final (`status.codedGameState` `F` or `O`). Days are 1 second apart. dlt's HTTP client retries timeouts, connection errors, and 429/5xx responses with backoff. A day that still fails is logged and skipped, and the run carries on and exits `1` at the end, listing the failed days.
+2. **One snapshot load**, as of the window's **end date**: `teams` for every season the window touches, `standings` for both leagues, and the 40-man `rosters` of every team in the end date's season. A multi-day window does not produce daily standings or rosters.
+3. **One `people` load:** bios for player IDs seen in this run's boxscores and rosters that were never fetched before, up to 100 per request. Existing bios aren't refreshed. This load also saves the watermark and the set of fetched IDs, so if the snapshot or `people` step fails, the run exits non-zero with the watermark unchanged.
+
+So a two-day backfill makes four loads (four marker files). Re-running a range appends new copies of its rows under new load ids. Staging deduplicates (latest load wins).
+
 **Output:**
-- Parquet files in `data/lake/raw_mlb/schedule/`, `boxscore/`, `standings/`, `teams/`, `rosters/`, `people/`, plus child tables (e.g., `boxscore__players__...`).
-- Load markers in `data/lake/raw_mlb/_dlt_loads/`.
-- Updated schema in `schemas/export/dlt_mlb_api_schema.json`.
-- Logs to stdout and `data/logs/mlb_api_<timestamp>.log`.
+- Parquet files in `data/lake/raw_mlb/<table>/`. The main tables:
+
+  | Table | One row per | Notes |
+  |---|---|---|
+  | `schedule` | game on that day | `game_pk`, `game_type`, `official_date`, `status__*`, `teams__{away,home}__*` |
+  | `boxscore` | Final game | `game_pk`, team totals (`teams__{away,home}__team_stats__*`) |
+  | `boxscore__players` | player × game | `game_pk`, `team_id`, `side`, `person__id`, `stats__batting__*`, `stats__pitching__*` |
+  | `standings` | division × as-of date | `as_of_date`, `division__id`, `league__id` |
+  | `standings__team_records` | team × as-of date | `as_of_date`, `team__id`, `wins`, `losses`, ranks, games back |
+  | `teams` | team × season | `id`, `season`, `abbreviation`, `league__id`, `division__id` |
+  | `rosters` | player × team × roster date | `team_id`, `roster_date`, `person__id`, `status__code` |
+  | `people` | player | `id`, `full_name`, `bat_side__code`, `pitch_hand__code` |
+
+  dlt also writes smaller child tables for the other lists in a response, for example `boxscore__teams__away__batters`, `boxscore__officials`, and `standings__team_records__records__split_records`. Child tables link to their parent row through `_dlt_parent_id`. Every table, child tables included, carries `_dlt_load_id`.
+- One completed-load marker per load: `data/lake/raw_mlb/_dlt_loads/mlb_api__<load_id>.jsonl`.
+- The dlt schema in `schemas/export/mlb_api.schema.yaml`. Commit it.
+- Logs to stdout and `data/logs/mlb_api_<timestamp>.log`: the watermark and window, rows per table and duration of each dlt step for every load, schema changes, total rows per table, the number of new player IDs, and the new watermark.
+
+**Exit codes:** the same as Statcast: `0` success; `1` one or more days failed (the rest loaded), or the snapshot or `people` step failed; `2` refused to run.
+
+**Row shaping:** the pipeline changes the structure of three responses, never their values, so that staging never needs to join raw tables: boxscore players move into one list tagged with `game_pk`, `team_id`, and `side`; standings rows get `as_of_date`; roster rows get `team_id` and `roster_date`. See `ARCHITECTURE.md` §6.4.
 
 ---
 
@@ -97,7 +126,7 @@ Each pipeline tracks a `loaded_through` date in dlt's source state. When you run
 
 **Manual backfill:** Use `--start` and `--end` to load any date range explicitly. A backfill moves the watermark to its end date only if every day succeeded **and** it connects to the watermark: it starts on or before `loaded_through + 1`, or no watermark exists yet (so a first backfill sets it). A disconnected backfill (starting after `loaded_through + 1`) still lands its data but leaves the watermark unchanged.
 
-**Where the watermark lives:** in dlt source state, saved with each load and synced to the lake (`data/lake/raw_statcast/_dlt_pipeline_state/`). `data/dlt_pipelines/` is only a local working copy: deleting it is safe, and the next run restores the watermark from the lake.
+**Where the watermark lives:** in dlt source state, saved with each load and synced to the lake (`data/lake/raw_statcast/_dlt_pipeline_state/`, or `data/lake/raw_mlb/_dlt_pipeline_state/` for `mlb_api`, which also keeps its fetched player IDs there as `people_fetched`). `data/dlt_pipelines/` is only a local working copy: deleting it is safe, and the next run restores the watermark from the lake.
 
 **Printing the watermark:** every run logs it (`Watermark (loaded_through): ...`). To check without running:
 
@@ -105,7 +134,7 @@ Each pipeline tracks a `loaded_through` date in dlt's source state. When you run
 docker compose run --rm pipeline dlt pipeline --pipelines-dir /data/dlt_pipelines statcast info -v
 ```
 
-Look for `loaded_through` under `sources`. If `data/dlt_pipelines/` was deleted, restore it from the lake first:
+Look for `loaded_through` under `sources`. The commands below use the Statcast pipeline; for the MLB Stats API, replace `statcast` with `mlb_api` and `raw_statcast` with `raw_mlb`. If `data/dlt_pipelines/` was deleted, restore it from the lake first:
 
 ```bash
 docker compose run --rm -e DESTINATION__FILESYSTEM__BUCKET_URL=/data/lake pipeline \
@@ -249,6 +278,7 @@ python -c "import duckdb; db = duckdb.connect('data/warehouse/mlb.duckdb', read_
 ```bash
 docker compose run --rm pipeline ls -lh data/lake/
 docker compose run --rm pipeline ls -lh data/lake/raw_statcast/
+docker compose run --rm pipeline ls -lh data/lake/raw_mlb/
 docker compose run --rm pipeline find data/lake -name "*.parquet" | wc -l
 ```
 
@@ -257,6 +287,7 @@ docker compose run --rm pipeline find data/lake -name "*.parquet" | wc -l
 ```bash
 ls -la data/lake/raw_statcast/_dlt_loads/
 head -1 data/lake/raw_statcast/_dlt_loads/statcast__*.jsonl
+ls -la data/lake/raw_mlb/_dlt_loads/
 ```
 
 ### Check the dlt watermark

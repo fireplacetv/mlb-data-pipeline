@@ -1,0 +1,96 @@
+{
+  "copyright": "Copyright 2025 MLB Advanced Media, L.P.  Use of any content on this page acknowledges agreement to the terms posted here http://gdx.mlb.com/components/copyright.txt",
+  "totalItems": 1,
+  "totalEvents": 0,
+  "totalGames": 1,
+  "totalGamesInProgress": 0,
+  "dates": [
+    {
+      "date": "2025-09-02",
+      "totalItems": 1,
+      "totalEvents": 0,
+      "totalGames": 1,
+      "totalGamesInProgress": 0,
+      "games": [
+        {
+          "gamePk": 776601,
+          "gameGuid": "00000000-0000-0000-0000-000000776601",
+          "link": "/api/v1.1/game/776601/feed/live",
+          "gameType": "R",
+          "season": "2025",
+          "gameDate": "2025-09-02T17:05:00Z",
+          "officialDate": "2025-09-02",
+          "status": {
+            "abstractGameState": "Final",
+            "codedGameState": "F",
+            "detailedState": "Final",
+            "statusCode": "F",
+            "startTimeTBD": false,
+            "abstractGameCode": "F"
+          },
+          "teams": {
+            "away": {
+              "leagueRecord": {
+                "wins": 76,
+                "losses": 60,
+                "pct": ".559"
+              },
+              "score": 4,
+              "isWinner": true,
+              "team": {
+                "id": 119,
+                "name": "Los Angeles Dodgers",
+                "link": "/api/v1/teams/119"
+              },
+              "splitSquad": false,
+              "seriesNumber": 44
+            },
+            "home": {
+              "leagueRecord": {
+                "wins": 70,
+                "losses": 66,
+                "pct": ".515"
+              },
+              "score": 1,
+              "isWinner": false,
+              "team": {
+                "id": 137,
+                "name": "San Francisco Giants",
+                "link": "/api/v1/teams/137"
+              },
+              "splitSquad": false,
+              "seriesNumber": 44
+            }
+          },
+          "venue": {
+            "id": 2395,
+            "link": "/api/v1/venues/2395",
+            "name": "Oracle Park"
+          },
+          "content": {
+            "link": "/api/v1/game/776601/content"
+          },
+          "isTie": false,
+          "gameNumber": 1,
+          "publicFacing": true,
+          "doubleHeader": "N",
+          "gamedayType": "P",
+          "tiebreaker": "N",
+          "calendarEventID": "14-776601-2025-09-02",
+          "seasonDisplay": "2025",
+          "dayNight": "day",
+          "scheduledInnings": 9,
+          "reverseHomeAwayStatus": false,
+          "inningBreakLength": 120,
+          "gamesInSeries": 3,
+          "seriesGameNumber": 1,
+          "seriesDescription": "Regular Season",
+          "recordSource": "S",
+          "ifNecessary": "N",
+          "ifNecessaryDescription": "Normal Game"
+        }
+      ],
+      "events": []
+    }
+  ]
+}
