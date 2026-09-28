@@ -1,0 +1,18 @@
+# Local data: lake, warehouse, dlt state, caches, logs (bind-mounted to /data)
+data/
+
+# Secrets and local settings
+.env
+.dlt/secrets.toml
+
+# dbt build output and installed packages
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/

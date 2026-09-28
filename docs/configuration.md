@@ -80,16 +80,23 @@ Non-secret dlt settings. Checked in to git. Secrets go in `.dlt/secrets.toml` (g
 ```toml
 [runtime]
 log_level = "WARNING"
-log_format = "json"
+dlthub_telemetry = false
 
 [destination.filesystem]
 layout = "{table_name}/{load_id}.{file_id}.{ext}"
+
+[normalize.parquet_normalizer]
+add_dlt_load_id = true
 ```
+
+dlt reads this file from the working directory, so run pipelines from the repo root (the container's `/app`, which is the default).
 
 **Settings:**
 
-- **`runtime.log_level`:** dlt's own verbosity. Usually `WARNING`; set to `DEBUG` if investigating dlt issues.
-- **`destination.filesystem`:** File layout for the lake. The layout `{table_name}/{load_id}.{file_id}.{ext}` organizes Parquet files into folders per table, with one file per load. This is the default and is what staging expects.
+- **`runtime.log_level`:** dlt's own verbosity. Usually `WARNING`; set to `DEBUG` if investigating dlt issues. The pipelines' own logs follow `LOG_LEVEL`.
+- **`runtime.dlthub_telemetry`:** Off, so runs and tests make no network calls beyond the data sources.
+- **`destination.filesystem`:** File layout for the lake. The layout `{table_name}/{load_id}.{file_id}.{ext}` organizes Parquet files into folders per table, with one file per load. This is the default and is what staging expects. The lake location (`bucket_url`) isn't set here: the pipelines set it in code to `<MLB_DATA_DIR>/lake`.
+- **`normalize.parquet_normalizer.add_dlt_load_id`:** The Statcast pipeline yields DataFrames, and dlt only adds the `_dlt_load_id` column to DataFrame/Arrow rows when this is on. Staging deduplicates on `_dlt_load_id`, so leave it on.
 
 ### Secrets (`.dlt/secrets.toml`, not checked in)
 
@@ -154,7 +161,15 @@ GIANTS_TEAM_ID = int(os.getenv("GIANTS_TEAM_ID", "137"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 ```
 
-All of these are required to be set in `.env` (or `.env.local` for local overrides). The pipeline logs them at startup for debugging.
+Each has the default shown, so an unset variable falls back to it. `config.py` also defines fixed (non-env) settings:
+
+- **`SCHEMA_EXPORT_DIR`:** `schemas/export/` in the repo. dlt schemas are exported here after every run and committed.
+- **`SEASON_START` / `SEASON_END`:** February 15 and November 15. Days outside this range are skipped without calling the source.
+- The load-window and watermark rules (`choose_window`, `next_watermark`), described in `docs/usage.md`.
+
+The Statcast pipeline also has fixed politeness settings at the top of `src/mlb/pipelines/statcast.py`: 3 attempts per day, backoff starting at 5 seconds, and 2 seconds between days.
+
+The pybaseball cache (used by Statcast backfills) lives in `<MLB_DATA_DIR>/cache/pybaseball/`. The pipeline sets this directory in code; pybaseball's own `PYBASEBALL_CACHE` variable isn't needed.
 
 ---
 

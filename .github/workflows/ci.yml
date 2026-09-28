@@ -39,14 +39,14 @@ jobs:
       - name: Ingest Statcast
         if: hashFiles('src/mlb/pipelines/statcast.py') != ''
         run: >
-          docker compose run --rm --entrypoint python pipeline
-          -m mlb.pipelines.statcast --start "$INGEST_START" --end "$INGEST_END"
+          docker compose run --rm pipeline
+          python -m mlb.pipelines.statcast --start "$INGEST_START" --end "$INGEST_END"
 
       - name: Ingest MLB Stats API
         if: hashFiles('src/mlb/pipelines/mlb_api.py') != ''
         run: >
-          docker compose run --rm --entrypoint python pipeline
-          -m mlb.pipelines.mlb_api --start "$INGEST_START" --end "$INGEST_END"
+          docker compose run --rm pipeline
+          python -m mlb.pipelines.mlb_api --start "$INGEST_START" --end "$INGEST_END"
 
       - name: Warn about missing pipelines
         if: hashFiles('src/mlb/pipelines/statcast.py') == '' || hashFiles('src/mlb/pipelines/mlb_api.py') == ''
