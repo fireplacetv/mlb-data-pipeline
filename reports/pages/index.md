@@ -67,14 +67,21 @@ A regular nine-inning game has roughly 250 to 350 pitches, at least 9 batters an
 per team, so about 20+ batters and 4+ pitchers in total.
 
 ```sql games
-select matchup, score, detailed_state, pitches, batters, pitchers, game_pk
+select
+    matchup
+        || case when coded_game_state in ('F', 'O') then '' else ' (' || detailed_state || ')' end
+        as game,
+    score,
+    pitches,
+    batters,
+    pitchers
 from warehouse.games
 order by game_date, matchup
 ```
 
 <BarChart
     data={games}
-    x=matchup
+    x=game
     y=pitches
     swapXY=true
     sort=false
@@ -83,10 +90,11 @@ order by game_date, matchup
     <ReferenceArea yMin={250} yMax={350} label="typical" />
 </BarChart>
 
+Only games that aren't final show a status.
+
 <DataTable data={games} rows=all>
-    <Column id=matchup title="Game" />
+    <Column id=game />
     <Column id=score align=center />
-    <Column id=detailed_state title="Status" />
     <Column id=pitches />
     <Column id=batters />
     <Column id=pitchers />
@@ -116,18 +124,20 @@ zone. Balls should mostly land outside it, and strikes and balls in play inside 
     x=plate_x
     y=plate_z
     series=result
+    seriesOrder={['Ball', 'Strike', 'In play']}
     xMin={-2.5}
     xMax={2.5}
     yMin={-0.5}
     yMax={5.5}
-    pointSize={5}
+    pointSize={3}
+    opacity={0.6}
     chartAreaHeight={380}
     xAxisTitle="horizontal (ft)"
     yAxisTitle="height (ft)"
     xFmt="0.0"
     yFmt="0.0"
 >
-    <ReferenceArea xMin={-0.83} xMax={0.83} yMin={1.5} yMax={3.5} label="zone" border={true} />
+    <ReferenceArea xMin={-0.83} xMax={0.83} yMin={1.5} yMax={3.5} label="zone" opacity={0.3} border={true} borderType=solid borderWidth={2} borderColor="#1f1f1f" />
 </ScatterPlot>
 
 ```sql velocity
@@ -198,6 +208,7 @@ balls higher. Exit velocities top out around 115 mph.
     x=launch_angle
     y=launch_speed
     series=batted_ball
+    seriesOrder={['Ground ball', 'Line drive', 'Fly ball or popup']}
     pointSize={5}
     xAxisTitle="launch angle (degrees)"
     yAxisTitle="exit velocity (mph)"
@@ -211,24 +222,28 @@ look like a baseball field: ground balls close in, fly balls to the outfield.
     x=hc_x
     y=hc_y_up
     series=batted_ball
+    seriesOrder={['Ground ball', 'Line drive', 'Fly ball or popup']}
     xMin={0}
     xMax={250}
     yMin={0}
     yMax={250}
     pointSize={5}
     chartAreaHeight={380}
-    xAxisTitle="hc_x"
-    yAxisTitle="250 - hc_y"
+    xAxisTitle="left to right"
+    yAxisTitle="out from home plate"
 />
 
 ## Rows per model
 
 ```sql row_counts
 select
-    model,
+    replace(model, 'stg_', '') as model,
     row_count,
-    coalesce(min_date, '') as first_date,
-    coalesce(max_date, '') as last_date
+    case
+        when min_date is null then ''
+        when min_date = max_date then min_date
+        else min_date || ' to ' || max_date
+    end as dates
 from warehouse.row_counts
 order by row_count desc
 ```
@@ -236,8 +251,7 @@ order by row_count desc
 <DataTable data={row_counts} rows=all>
     <Column id=model />
     <Column id=row_count title="Rows" contentType=bar barColor="#a8c9f0" />
-    <Column id=first_date title="First date" />
-    <Column id=last_date title="Last date" />
+    <Column id=dates />
 </DataTable>
 
 ## Columns
@@ -251,19 +265,17 @@ usually means the source renamed or dropped a field. Search to filter by model o
 select
     replace(model, 'stg_', '') as model,
     column_name,
-    lower(column_type) as type,
     null_percentage / 100.0 as pct_null,
-    approx_unique
+    lower(column_type) as type
 from warehouse.column_profile
 order by null_percentage desc, model, column_name
 ```
 
 <DataTable data={column_profile} rows=15 search=true>
-    <Column id=model />
     <Column id=column_name title="Column" />
-    <Column id=type />
     <Column id=pct_null title="Null" fmt=pct0 contentType=bar barColor="#a8c9f0" />
-    <Column id=approx_unique title="Distinct (approx)" />
+    <Column id=model />
+    <Column id=type />
 </DataTable>
 
 ## Loads and sample rows

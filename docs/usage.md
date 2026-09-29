@@ -249,7 +249,7 @@ docker compose run --rm --service-ports reports run dev
 - Each game with its pitch and boxscore counts, against the typical 250 to 350 pitches.
 - Pitch locations colored by result (ball, strike, in play) around a strike zone, velocity by pitch type, and pitch mix.
 - Exit velocity by launch angle, and a spray chart.
-- Rows and date range per model.
+- Rows and dates per model.
 - Every column of every model with its type and null rate, most-null first, searchable.
 - Collapsed: the completed dlt loads and 100 sample pitches.
 
