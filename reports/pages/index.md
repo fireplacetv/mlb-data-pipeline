@@ -125,7 +125,7 @@ play (triangles) inside or near it.
     series=result
     seriesOrder={['Ball', 'Strike', 'In play']}
     echartsOptions={{
-        series: [{ symbol: 'emptyCircle' }, { symbol: 'circle' }, { symbol: 'triangle' }, { z: 10 }],
+        series: [{ symbol: 'emptyCircle' }, { symbol: 'circle' }, { symbol: 'triangle' }],
         legend: { data: [
             { name: 'Ball', icon: 'emptyCircle' },
             { name: 'Strike', icon: 'circle' },
@@ -136,15 +136,15 @@ play (triangles) inside or near it.
     xMax={2.5}
     yMin={-0.5}
     yMax={5.5}
-    pointSize={4}
-    opacity={0.7}
+    pointSize={3}
+    opacity={0.5}
     chartAreaHeight={380}
     xAxisTitle="horizontal (ft)"
     yAxisTitle="height (ft)"
     xFmt="0.0"
     yFmt="0.0"
 >
-    <ReferenceArea xMin={-0.83} xMax={0.83} yMin={1.5} yMax={3.5} label="zone" opacity={0.3} border={true} borderType=solid borderWidth={2} borderColor="#1f1f1f" />
+    <ReferenceArea xMin={-0.83} xMax={0.83} yMin={1.5} yMax={3.5} label="zone" border={true} borderType=solid borderWidth={2} borderColor="#1f1f1f" />
 </ScatterPlot>
 
 ```sql velocity
