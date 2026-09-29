@@ -26,3 +26,20 @@ services:
     # deleted to rebuild from the lake), then hand the arguments to dbt.
     entrypoint: ["sh", "-c", 'mkdir -p "$$MLB_DATA_DIR/warehouse" && exec dbt "$$@"', "dbt"]
     command: ["build"]
+
+  # Evidence report over the warehouse (reports/). Node, not the Python image; reads
+  # data/warehouse/mlb.duckdb read-only through the repo mount.
+  reports:
+    image: node:22-bookworm-slim
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /app/reports
+    environment:
+      HOME: /tmp
+      npm_config_cache: /tmp/.npm
+      SEND_ANONYMOUS_USAGE_STATS: "no"
+    volumes:
+      - .:/app
+    ports:
+      - "3000:3000"
+    entrypoint: ["npm"]
+    command: ["run", "build"]

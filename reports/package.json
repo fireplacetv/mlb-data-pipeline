@@ -1,0 +1,26 @@
+{
+  "name": "mlb-data-report",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sources": "evidence sources --strict",
+    "build": "evidence sources --strict && evidence build:strict",
+    "dev": "evidence sources --strict && evidence dev --host 0.0.0.0",
+    "preview": "evidence preview"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@evidence-dev/core-components": "5.4.2",
+    "@evidence-dev/duckdb": "2.0.1",
+    "@evidence-dev/evidence": "40.1.8"
+  },
+  "overrides": {
+    "typescript": "5.9.3",
+    "jsonwebtoken": "9.0.0",
+    "trim@<0.0.3": ">0.0.3",
+    "axios": "^1.7.4"
+  }
+}

@@ -18,11 +18,12 @@ A containerized **ELT data pipeline** for MLB data:
 - dbt project with sources, staging models, and staging-level tests
 - Documented commands instead of a wrapper layer: each step runs directly with `docker compose run` (pipeline modules and `dbt`), listed in a Quick Start in `README.md` with fuller reference in `docs/` (§9.1)
 - Unit tests with recorded fixtures, and CI
+- A static data report of the staging layer ([Evidence](https://github.com/evidence-dev/evidence), §9.3), built in CI and published per PR, so a person can smell-test what landed
 - A `docs/` folder (§9.1): environment setup instructions, configuration reference (`.env` and dlt config/secrets), and `docs/roadmap/` with design docs for future development phases
 
 **Out of scope:**
 - Intermediate models, facts, dimensions, marts, snapshots, rolling metrics, or any other business logic
-- A semantic layer, BI, dashboards, notebooks, or reports
+- A semantic layer, BI, dashboards, notebooks, or reports beyond the CI smell-test report in §9.3
 - Scheduling and orchestration (cron, Dagster, Airflow). Every run is started by hand with the documented commands.
 - Cloud hosting and multi-user access
 
@@ -55,6 +56,7 @@ A containerized **ELT data pipeline** for MLB data:
 | Warehouse | DuckDB | `data/warehouse/mlb.duckdb` |
 | Transform | `dbt-core` + `dbt-duckdb` | Staging layer only |
 | Quality | dbt tests, `pytest`, `ruff` | Run by hand and in CI |
+| Data report | Evidence (open-source static build, Node) | `reports/`; its own `node` service, not the Python image (§9.3) |
 
 **Python dependencies** (declared in `pyproject.toml`, locked in `uv.lock`):
 - Runtime: `dlt[parquet]`, `pybaseball`, `pandas`, `pyarrow`, `duckdb`, `dbt-core`, `dbt-duckdb`
@@ -106,7 +108,9 @@ mlb-pipeline/
 ├── Dockerfile
 ├── .dockerignore
 ├── docker-compose.yml
-├── .github/workflows/ci.yml
+├── .github/workflows/
+│   ├── ci.yml                   # ingest, dbt, data report (§9)
+│   └── report-preview-cleanup.yml  # removes a PR's report preview when it closes (§9.3)
 ├── .dlt/
 │   └── config.toml              # dlt runtime + destination config (no secrets)
 ├── schemas/
@@ -127,6 +131,10 @@ mlb-pipeline/
 │   │   ├── statcast/
 │   │   └── mlb/
 │   └── tests/                   # singular data tests
+├── reports/                     # Evidence data report (§9.3)
+│   ├── package.json, package-lock.json, evidence.config.yaml
+│   ├── sources/warehouse/       # connection.yaml + source queries against mlb.duckdb
+│   └── pages/index.md           # the report page
 ├── tests/                       # pytest
 │   ├── fixtures/
 │   │   ├── api/                 # recorded MLB API responses
@@ -470,15 +478,30 @@ services:
     # DuckDB won't create a missing folder, so make data/warehouse first (§7.2).
     entrypoint: ["sh", "-c", 'mkdir -p "$$MLB_DATA_DIR/warehouse" && exec dbt "$$@"', "dbt"]
     command: ["build"]
+
+  reports:            # Evidence report (§9.3): docker compose run --rm reports run build
+    image: node:22-bookworm-slim
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /app/reports
+    environment:
+      HOME: /tmp
+      npm_config_cache: /tmp/.npm
+      SEND_ANONYMOUS_USAGE_STATS: "no"
+    volumes:
+      - .:/app        # reads data/warehouse/mlb.duckdb through the repo mount
+    ports:
+      - "3000:3000"   # dev server only, with --service-ports
+    entrypoint: ["npm"]
+    command: ["run", "build"]
 ```
 
 **Rules:**
 - Every path comes from `MLB_DATA_DIR`. Never hard-code `./data` or `/data`.
-- One-shot commands only: `docker compose run --rm`. No long-running services.
+- One-shot commands only: `docker compose run --rm`. No long-running services. (The report's dev server is started the same way and stopped with Ctrl-C.)
 - No data or secrets in the image. `.env` is read at runtime.
 - `.env.example` documents `MLB_DATA_DIR`, `LOOKBACK_DAYS`, `MAX_CATCHUP_DAYS`, `GIANTS_TEAM_ID`, `LOG_LEVEL`, and the `UID`/`GID` note for Linux.
 - Only one process may write `mlb.duckdb` at a time.
-- Outbound HTTPS needed: `statsapi.mlb.com`, `baseballsavant.mlb.com`, plus PyPI and the dbt package hub at build time. No inbound ports.
+- Outbound HTTPS needed: `statsapi.mlb.com`, `baseballsavant.mlb.com`, plus PyPI and the dbt package hub at build time. The report (§9.3) also needs Docker Hub (`node` image), the npm registry, and `extensions.duckdb.org` (DuckDB's Parquet extension for WebAssembly, fetched when the report builds and again in the viewer's browser). No inbound ports, except the report's local dev server.
 
 **Commands.** There is no CLI wrapper or Makefile. These are the commands, and they're what `README.md` and `docs/usage.md` document:
 
@@ -496,10 +519,13 @@ services:
 | Auto-fix and format | `docker compose run --rm pipeline ruff check --fix .` and `docker compose run --rm pipeline ruff format .` |
 | Shell in the container | `docker compose run --rm pipeline bash` |
 | Reset the warehouse | `rm -rf data/warehouse` (safe: rebuilt from the lake) |
+| Install report dependencies | `docker compose run --rm reports ci` |
+| Build the data report | `docker compose run --rm reports run build` |
+| Data report dev server | `docker compose run --rm --service-ports reports run dev` |
 
 Each pipeline module exits non-zero on failure and logs to stdout and `data/logs/`, with per-step durations and row counts.
 
-**CI (GitHub Actions, on PR and on push to `main`):** `.github/workflows/ci.yml` builds the same image with `docker compose build`, runs both dlt pipelines against the live sources for one fixed day (`2025-09-01`), then runs `dbt run` and `dbt test` on that day's data (separate steps, so model errors and test failures show up separately and a failing test doesn't block other models), which checks the staging column lists and tests against real responses. A pipeline whose module doesn't exist yet is skipped with a warning, so the workflow is usable from M0. Logs from `data/logs/` and `dbt/logs/` are uploaded as an artifact. Planned for M4: add `ruff check`, `ruff format --check`, `pytest`, and a `dbt build` against the fixture lake. That job copies `tests/fixtures/lake/` into `lake/` under a temporary directory and sets `MLB_DATA_DIR` to that directory, so the warehouse never lands inside `tests/`. The fixture lake covers one date and includes a duplicate pitch across two loads, an incomplete load with no marker file, and a doubleheader.
+**CI (GitHub Actions, on PR and on push to `main`):** `.github/workflows/ci.yml` builds the same image with `docker compose build`, runs both dlt pipelines against the live sources for one fixed day (`2025-09-01`), then runs `dbt run` and `dbt test` on that day's data (separate steps, so model errors and test failures show up separately and a failing test doesn't block other models), which checks the staging column lists and tests against real responses. A pipeline whose module doesn't exist yet is skipped with a warning, so the workflow is usable from M0. It then builds the data report (§9.3) from that day's warehouse whenever `dbt run` succeeded, even if `dbt test` failed, and a separate `publish-report` job (the only one with write access) publishes it to GitHub Pages. Logs from `data/logs/` and `dbt/logs/` are uploaded as an artifact. Planned for M4: add `ruff check`, `ruff format --check`, `pytest`, and a `dbt build` against the fixture lake. That job copies `tests/fixtures/lake/` into `lake/` under a temporary directory and sets `MLB_DATA_DIR` to that directory, so the warehouse never lands inside `tests/`. The fixture lake covers one date and includes a duplicate pitch across two loads, an incomplete load with no marker file, and a doubleheader.
 
 ### 9.1 Documentation (`docs/`)
 
@@ -555,6 +581,18 @@ Docs live in the repo, in Markdown, and change in the same PR as the code they d
 - **SQL:** lowercase keywords and identifiers, one CTE per step, and a one-line comment on any DuckDB-specific SQL (§8). Every model has a description and tests in its YAML.
 - **Scope:** don't add features, abstractions, or dependencies beyond the current milestone. If the spec is ambiguous or wrong, say so and propose an edit to this file rather than guessing.
 - **Docs:** update `README.md` and `docs/` in the same change as the code (§9.1).
+
+### 9.3 Data report (Evidence)
+
+**Goal:** a person, often reviewing on a phone, can smell-test what landed in staging without a local checkout. It complements the dbt tests, which stay the pass/fail gate; the report never fails CI over the data itself (only over a broken report).
+
+**Tool:** the open-source, static-site version of Evidence (`@evidence-dev/evidence` 40.x on npm), pinned in `reports/package-lock.json`. Evidence's current product (Evidence Studio) needs a running server or their hosting and has no connector for a local DuckDB file, so it doesn't fit a static GitHub Pages site. Evidence now calls the static version "legacy", so expect to maintain the pins: `package.json` already overrides `typescript` to 5.x because the legacy toolchain rejects TypeScript 7.
+
+**How it reads data:** `reports/sources/warehouse/connection.yaml` opens `data/warehouse/mlb.duckdb` read-only (a path relative to that folder). `evidence sources` runs each `sources/warehouse/*.sql` query against it and stores the results as Parquet in the site; the page's own SQL then runs in the browser with DuckDB WebAssembly. Evidence's DuckDB (`@duckdb/node-api`) must be able to read the file dbt's DuckDB wrote, so keep the two on compatible versions when bumping either. Source queries read only `staging.*`.
+
+**What the page shows** (`reports/pages/index.md`): totals and alerts (empty models, final games without pitches), rows and date range per model, completed loads, one row per game with its pitch and boxscore counts, null percentage of every `stg_statcast__pitches` column, pitch mix, velocity by pitch type, pitch locations against an approximate zone, exit velocity by launch angle, a spray chart, every model's column types and null rates, and sample pitches.
+
+**Publishing:** GitHub Pages from the `gh-pages` branch. On a PR from this repo, CI publishes to `pr-preview/pr-<N>/` with `rossjrw/pr-preview-action`, which comments the link on the PR; `report-preview-cleanup.yml` removes it when the PR closes. On push to `main`, CI publishes to the site root with `JamesIves/github-pages-deploy-action`, keeping `pr-preview/`. The build's `deployment.basePath` is appended to `evidence.config.yaml` in CI to match. Both jobs share the `gh-pages` concurrency group. The site is public.
 
 ---
 
@@ -638,6 +676,10 @@ Source documentation is in §6.1. When a doc and this spec disagree on API detai
 - [dbt sources](https://docs.getdbt.com/docs/build/sources) · [Cross-database macros](https://docs.getdbt.com/reference/dbt-jinja-functions/cross-database-macros)
 - [dbt_utils README](https://github.com/dbt-labs/dbt-utils): `deduplicate`, `unique_combination_of_columns`, `accepted_range`, `recency`, `star` · [latest version on dbt Hub](https://hub.getdbt.com/dbt-labs/dbt_utils/latest/)
 - [DuckDB: reading Parquet](https://duckdb.org/docs/current/data/parquet/overview.html) · [combining schemas](https://duckdb.org/docs/current/data/multiple_files/combining_schemas.html) · [concurrency](https://duckdb.org/docs/current/connect/concurrency)
+
+**Data report**
+- [Evidence (open-source) repo](https://github.com/evidence-dev/evidence) and its [legacy docs](https://docs.evidence.dev): components, DuckDB source, deployment `basePath` · [migration guide](https://docs.evidence.studio/migration-guide) (what the current Evidence dropped)
+- [rossjrw/pr-preview-action](https://github.com/rossjrw/pr-preview-action) · [JamesIves/github-pages-deploy-action](https://github.com/JamesIves/github-pages-deploy-action)
 
 **Environment**
 - [uv in Docker](https://docs.astral.sh/uv/guides/integration/docker/)

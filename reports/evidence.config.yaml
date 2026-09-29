@@ -1,0 +1,11 @@
+# Evidence (open-source, static build) settings. CI appends a deployment.basePath so the
+# site works under its GitHub Pages path; locally the site is served from /.
+appearance:
+  default: system
+  switcher: true
+
+plugins:
+  components:
+    "@evidence-dev/core-components": {}
+  datasources:
+    "@evidence-dev/duckdb": {}

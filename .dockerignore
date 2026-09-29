@@ -9,3 +9,7 @@ __pycache__/
 .env
 .env.local
 .DS_Store
+reports/node_modules/
+reports/build/
+reports/.evidence/
+reports/.svelte-kit/

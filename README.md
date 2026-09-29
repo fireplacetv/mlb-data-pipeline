@@ -71,6 +71,15 @@ docker compose run --rm pipeline ruff check .
 docker compose run --rm pipeline ruff format --check .
 ```
 
+### 7. Look at the data (optional)
+
+```bash
+docker compose run --rm reports ci                          # once: install the report's packages
+docker compose run --rm --service-ports reports run dev     # http://localhost:3000
+```
+
+An [Evidence](https://github.com/evidence-dev/evidence) page of charts and tables over the staging layer, for a quick smell test of what landed. CI builds the same report for every PR and links it from the PR. See [`docs/usage.md`](./docs/usage.md#data-report).
+
 ---
 
 ## Commands Reference
@@ -92,6 +101,9 @@ See [`docs/usage.md`](./docs/usage.md) for full details on each command.
 | Auto-fix and format | `docker compose run --rm pipeline ruff check --fix . && docker compose run --rm pipeline ruff format .` |
 | Shell in the container | `docker compose run --rm pipeline bash` |
 | Reset the warehouse | `rm -rf data/warehouse` (safe: rebuilt from the lake) |
+| Install report dependencies | `docker compose run --rm reports ci` |
+| Build the data report | `docker compose run --rm reports run build` |
+| Data report dev server | `docker compose run --rm --service-ports reports run dev` |
 
 ---
 
@@ -116,6 +128,7 @@ See [`docs/usage.md`](./docs/usage.md) for full details on each command.
 | Warehouse | [DuckDB](https://duckdb.org/) |
 | Transform | [dbt-core](https://www.getdbt.com/) + [dbt-duckdb](https://github.com/duckdb/dbt-duckdb) |
 | Quality | dbt tests, [pytest](https://pytest.org/), [ruff](https://docs.astral.sh/ruff/) |
+| Data report | [Evidence](https://github.com/evidence-dev/evidence) (open-source static build), published to GitHub Pages |
 
 ---
 

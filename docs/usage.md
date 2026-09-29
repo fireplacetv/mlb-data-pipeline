@@ -220,6 +220,38 @@ docker compose run --rm dbt docs serve  # In a separate terminal to see them loc
 
 ---
 
+## Data Report
+
+`reports/` is an [Evidence](https://github.com/evidence-dev/evidence) project: one page of charts and tables over the staging layer, for smell-testing what landed. CI builds it for every PR (see "Continuous Integration"); you can also build it or run it live from your own warehouse. It runs in the `reports` service (a `node` image), not the Python image.
+
+Install its packages once (and again after `reports/package-lock.json` changes). They go in `reports/node_modules/`:
+
+```bash
+docker compose run --rm reports ci
+```
+
+Build the static site into `reports/build/`:
+
+```bash
+docker compose run --rm reports run build
+```
+
+Or run the dev server, which reloads as you edit `reports/pages/index.md`, at http://localhost:3000 (stop with Ctrl-C):
+
+```bash
+docker compose run --rm --service-ports reports run dev
+```
+
+**Before either:** build the warehouse with `dbt build`, and don't have dbt running at the same time. Both commands first run `evidence sources`, which opens `data/warehouse/mlb.duckdb` read-only and runs each query in `reports/sources/warehouse/` against it. To pick up new data, run the command again.
+
+**What's on the page:** totals and alerts (empty models, final games without pitches), rows and date range per model, completed loads, each game with its pitch and boxscore counts, the null percentage of every Statcast column, pitch mix, velocity by pitch type, pitch locations, exit velocity by launch angle, a spray chart, every model's column types and null rates, and sample pitches.
+
+**Changing it:** source queries (`reports/sources/warehouse/*.sql`) read `staging.*` in DuckDB SQL; each becomes a table `warehouse.<file name>` that the page's SQL blocks query. Both builds run in strict mode, so a failing query fails the build. The page uses the Svelte-style syntax of the open-source Evidence, for example `<BarChart data={games} x=matchup y=pitches />`; see its [component docs](https://docs.evidence.dev/components/all-components). (Evidence's newer hosted product uses a different syntax and isn't used here; see `ARCHITECTURE.md` §9.3.)
+
+**Network:** the build downloads DuckDB's Parquet extension for WebAssembly from `extensions.duckdb.org`, and so does the browser viewing the report.
+
+---
+
 ## Testing and Quality
 
 ### Run unit tests
@@ -270,7 +302,15 @@ docker compose run --rm pipeline ruff format .
 2. Runs `docker compose build`.
 3. Runs both dlt pipelines against the live sources for one fixed day (`INGEST_START`/`INGEST_END` at the top of the workflow, currently `2025-09-01`). A pipeline whose module doesn't exist yet is skipped with a warning annotation.
 4. Runs `dbt run` and then `dbt test` on that day's data, which checks the staging column lists and tests against real API responses (unit tests use hand-written fixtures). They're separate steps so a model error and a test failure show up separately, and a failing test doesn't stop other models from building.
-5. Uploads `data/logs/` and `dbt/logs/` as the `logs` artifact, even on failure.
+5. Builds the data report (see "Data Report") if `dbt run` succeeded, even when `dbt test` failed, and uploads it as the `data-report` artifact.
+6. Uploads `data/logs/` and `dbt/logs/` as the `logs` artifact, even on failure.
+7. In a separate `publish-report` job, publishes the report to GitHub Pages on the `gh-pages` branch:
+   - **On a PR:** to `https://<owner>.github.io/<repo>/pr-preview/pr-<N>/`. A bot comment on the PR links to it (with a QR code), updated on every push. `.github/workflows/report-preview-cleanup.yml` deletes the preview when the PR closes. PRs from forks don't get a preview.
+   - **On `main`:** to `https://<owner>.github.io/<repo>/`, leaving the PR previews in place.
+
+   The job summary of `publish-report` also has the link. GitHub Pages can take a minute or two to update after the job finishes.
+
+**One-time repository setup for the report:** after the first CI run has created the `gh-pages` branch, set **Settings → Pages → Build and deployment → Source** to **Deploy from a branch**, branch `gh-pages`, folder `/ (root)`. (Not "GitHub Actions": the preview Action pushes to the branch.) The workflows ask for write access themselves, so the default workflow permissions can stay read-only. The site is public, even for a private repository on a plan that allows Pages.
 
 To reproduce CI locally:
 
@@ -280,6 +320,8 @@ docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2025-0
 docker compose run --rm pipeline python -m mlb.pipelines.mlb_api --start 2025-09-01 --end 2025-09-01
 docker compose run --rm dbt run
 docker compose run --rm dbt test
+docker compose run --rm reports ci
+docker compose run --rm reports run build
 ```
 
 ---
