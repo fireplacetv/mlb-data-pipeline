@@ -1,0 +1,30 @@
+name: Remove data report preview
+
+# Removes a PR's report preview (pr-preview/pr-<N>/ on gh-pages) when the PR closes. CI
+# publishes it; see the publish-report job in ci.yml.
+on:
+  pull_request:
+    types: [closed]
+
+concurrency:
+  group: gh-pages
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  remove-preview:
+    name: Remove preview
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: rossjrw/pr-preview-action@v1.8.1
+        with:
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview
+          action: remove

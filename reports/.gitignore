@@ -1,0 +1,8 @@
+# Evidence build output, caches, and installed packages
+.evidence/template
+.evidence/meta
+.svelte-kit
+build
+node_modules
+static/data
+*.options.yaml

@@ -1,0 +1,7 @@
+# The dbt warehouse, opened read-only. The path is relative to this folder, so it points at
+# <repo>/data/warehouse/mlb.duckdb (the default MLB_DATA_DIR). To read another file, set
+# EVIDENCE_SOURCE__warehouse__filename (also relative to this folder).
+name: warehouse
+type: duckdb
+options:
+  filename: ../../../data/warehouse/mlb.duckdb

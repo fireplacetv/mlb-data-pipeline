@@ -200,6 +200,15 @@ The `dbt` service's entrypoint runs `mkdir -p "$MLB_DATA_DIR/warehouse"` and the
 
 You can add more variables to `.env` and they'll be picked up by `docker-compose.yml` automatically.
 
+### The `reports` service
+
+The data report (`reports/`, see `docs/usage.md`) runs in its own `node:22-bookworm-slim` container, not the Python image, and doesn't read `.env`. It mounts the repo at `/app`, runs as your `UID`/`GID`, and sets:
+
+- **`HOME` and `npm_config_cache`:** `/tmp`, so npm has somewhere writable as a non-root user.
+- **`SEND_ANONYMOUS_USAGE_STATS: "no"`:** turns off Evidence's usage telemetry, the same way dbt's is off.
+
+Evidence settings live in `reports/evidence.config.yaml` (plugins, theme) and `reports/sources/warehouse/connection.yaml` (the DuckDB file, as a path relative to that folder: `../../../data/warehouse/mlb.duckdb`). To read a different file, set `EVIDENCE_SOURCE__warehouse__filename`, also relative to `reports/sources/warehouse/`, for example with `docker compose run --rm -e EVIDENCE_SOURCE__warehouse__filename=... reports run build`. The report needs no secrets.
+
 ---
 
 ## Troubleshooting Configuration

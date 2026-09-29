@@ -22,6 +22,8 @@ jobs:
     name: Ingest + dbt
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      report_built: ${{ steps.report.outcome == 'success' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -57,10 +59,35 @@ jobs:
       # steps: model errors show up in `dbt run`, data test failures in `dbt test`, and a
       # failing test doesn't stop other models from building.
       - name: dbt run
+        id: dbt_run
         run: docker compose run --rm dbt run
 
       - name: dbt test
         run: docker compose run --rm dbt test
+
+      # The Evidence report (reports/) over the day just built, for a human smell test. Built
+      # even when dbt test fails, since that's when a look at the data helps most. The base
+      # path matches where publish-report serves it on GitHub Pages.
+      - name: Build data report
+        id: report
+        if: ${{ !cancelled() && steps.dbt_run.outcome == 'success' }}
+        env:
+          REPORT_BASE_PATH: >-
+            ${{ github.event_name == 'pull_request'
+              && format('/{0}/pr-preview/pr-{1}', github.event.repository.name, github.event.number)
+              || format('/{0}', github.event.repository.name) }}
+        run: |
+          printf '\ndeployment:\n  basePath: %s\n' "$REPORT_BASE_PATH" >> reports/evidence.config.yaml
+          docker compose run --rm reports ci
+          docker compose run --rm reports run build
+
+      - name: Upload data report
+        if: ${{ !cancelled() && steps.report.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-report
+          path: reports/build/
+          if-no-files-found: error
 
       - name: Upload logs
         if: always()
@@ -71,3 +98,78 @@ jobs:
             data/logs/
             dbt/logs/
           if-no-files-found: ignore
+
+  # Publishes the report to the gh-pages branch: each PR under pr-preview/pr-<N>/ (with a link
+  # commented on the PR), main at the site root. Its own job so only this job can write to the
+  # repo. Skipped for PRs from forks, whose token can't push.
+  publish-report:
+    name: Publish data report
+    needs: pipeline
+    if: >-
+      ${{ !cancelled() && needs.pipeline.outputs.report_built == 'true'
+        && (github.event_name == 'push'
+            || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: gh-pages
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download data report
+        uses: actions/download-artifact@v4
+        with:
+          name: data-report
+          path: report-site/
+
+      - name: Publish PR preview
+        id: preview
+        if: github.event_name == 'pull_request'
+        uses: rossjrw/pr-preview-action@v1.8.1
+        with:
+          source-dir: report-site/
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview
+          action: deploy
+
+      - name: Publish main report
+        if: github.event_name == 'push'
+        uses: JamesIves/github-pages-deploy-action@v4.9.0
+        with:
+          folder: report-site/
+          branch: gh-pages
+          # Keep the PR previews; rebase instead of force-pushing over them.
+          clean-exclude: pr-preview/
+          force: false
+
+      # GitHub Pages runs Jekyll on the branch unless its root has a .nojekyll file, and
+      # Jekyll drops folders starting with "_", which is where Evidence puts its CSS and JS
+      # (_app/). Neither deploy Action adds the file at the branch root, and the main deploy
+      # cleans it away, so add it back after every deploy.
+      - name: Turn off Jekyll on gh-pages
+        run: |
+          git fetch --depth 1 origin gh-pages
+          if git cat-file -e origin/gh-pages:.nojekyll 2>/dev/null; then
+            exit 0
+          fi
+          git worktree add --detach "$RUNNER_TEMP/gh-pages" origin/gh-pages
+          cd "$RUNNER_TEMP/gh-pages"
+          touch .nojekyll
+          git add .nojekyll
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Add .nojekyll so GitHub Pages serves _app/"
+          git push origin HEAD:gh-pages
+
+      - name: Link the report
+        env:
+          REPORT_URL: >-
+            ${{ github.event_name == 'pull_request'
+              && steps.preview.outputs.preview-url
+              || format('https://{0}.github.io/{1}/', github.repository_owner, github.event.repository.name) }}
+        run: |
+          echo "Data report: $REPORT_URL" >> "$GITHUB_STEP_SUMMARY"
