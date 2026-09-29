@@ -134,7 +134,7 @@ mlb-pipeline/
 ├── reports/                     # Evidence data report (§9.3)
 │   ├── package.json, package-lock.json, evidence.config.yaml
 │   ├── sources/warehouse/       # connection.yaml + source queries against mlb.duckdb
-│   └── pages/index.md           # the report page
+│   └── pages/                   # index.md (the report page), +layout.svelte (page chrome)
 ├── tests/                       # pytest
 │   ├── fixtures/
 │   │   ├── api/                 # recorded MLB API responses
@@ -590,7 +590,7 @@ Docs live in the repo, in Markdown, and change in the same PR as the code they d
 
 **How it reads data:** `reports/sources/warehouse/connection.yaml` opens `data/warehouse/mlb.duckdb` read-only (a path relative to that folder). `evidence sources` runs each `sources/warehouse/*.sql` query against it and stores the results as Parquet in the site; the page's own SQL then runs in the browser with DuckDB WebAssembly. Evidence's DuckDB (`@duckdb/node-api`) must be able to read the file dbt's DuckDB wrote, so keep the two on compatible versions when bumping either. Source queries read only `staging.*`.
 
-**What the page shows** (`reports/pages/index.md`): totals and alerts (empty models, final games without pitches), rows and date range per model, completed loads, one row per game with its pitch and boxscore counts, null percentage of every `stg_statcast__pitches` column, pitch mix, velocity by pitch type, pitch locations against an approximate zone, exit velocity by launch angle, a spray chart, every model's column types and null rates, and sample pitches.
+**What the page shows** (`reports/pages/index.md`), in order: totals and alerts (empty models, final games without pitches); each game with its pitch and boxscore counts against the typical pitch range; pitch locations by result against a strike zone, velocity by pitch type, and pitch mix; exit velocity by launch angle and a spray chart; rows and date range per model; every column of every model, most-null first; and, collapsed, the completed loads and sample pitches. `reports/pages/+layout.svelte` hides Evidence's sidebar and breadcrumbs so the page reads well on a phone, and `evidence.config.yaml` replaces Evidence's default series colors (which fail colorblind checks) with a validated palette; scatter charts use at most three series.
 
 **Publishing:** GitHub Pages from the `gh-pages` branch. On a PR from this repo, CI publishes to `pr-preview/pr-<N>/` with `rossjrw/pr-preview-action`, which comments the link on the PR; `report-preview-cleanup.yml` removes it when the PR closes. On push to `main`, CI publishes to the site root with `JamesIves/github-pages-deploy-action`, keeping `pr-preview/`. The build's `deployment.basePath` is appended to `evidence.config.yaml` in CI to match. Both jobs share the `gh-pages` concurrency group. The site is public.
 

@@ -244,7 +244,14 @@ docker compose run --rm --service-ports reports run dev
 
 **Before either:** build the warehouse with `dbt build`, and don't have dbt running at the same time. Both commands first run `evidence sources`, which opens `data/warehouse/mlb.duckdb` read-only and runs each query in `reports/sources/warehouse/` against it. To pick up new data, run the command again.
 
-**What's on the page:** totals and alerts (empty models, final games without pitches), rows and date range per model, completed loads, each game with its pitch and boxscore counts, the null percentage of every Statcast column, pitch mix, velocity by pitch type, pitch locations, exit velocity by launch angle, a spray chart, every model's column types and null rates, and sample pitches.
+**What's on the page**, top to bottom:
+- Totals, and alerts for empty models or final games with no Statcast pitches.
+- Each game with its pitch and boxscore counts, against the typical 250 to 350 pitches.
+- Pitch locations colored by result (ball, strike, in play) around a strike zone, velocity by pitch type, and pitch mix.
+- Exit velocity by launch angle, and a spray chart.
+- Rows and date range per model.
+- Every column of every model with its type and null rate, most-null first, searchable.
+- Collapsed: the completed dlt loads and 100 sample pitches.
 
 **Changing it:** source queries (`reports/sources/warehouse/*.sql`) read `staging.*` in DuckDB SQL; each becomes a table `warehouse.<file name>` that the page's SQL blocks query. Both builds run in strict mode, so a failing query fails the build. The page uses the Svelte-style syntax of the open-source Evidence, for example `<BarChart data={games} x=matchup y=pitches />`; see its [component docs](https://docs.evidence.dev/components/all-components). (Evidence's newer hosted product uses a different syntax and isn't used here; see `ARCHITECTURE.md` §9.3.)
 
