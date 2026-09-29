@@ -29,7 +29,6 @@ select
     g.game_type,
     coalesce(away.abbreviation, g.away_team_name)
         || ' @ ' || coalesce(home.abbreviation, g.home_team_name) as matchup,
-    g.away_score || '-' || g.home_score as score,
     g.detailed_state,
     g.coded_game_state,
     coalesce(p.pitches, 0) as pitches,

@@ -71,7 +71,6 @@ select
     matchup
         || case when coded_game_state in ('F', 'O') then '' else ' (' || detailed_state || ')' end
         as game,
-    score,
     pitches,
     batters,
     pitchers
@@ -94,7 +93,6 @@ Only games that aren't final show a status.
 
 <DataTable data={games} rows=all>
     <Column id=game />
-    <Column id=score align=center />
     <Column id=pitches />
     <Column id=batters />
     <Column id=pitchers />
@@ -127,7 +125,7 @@ play (triangles) inside or near it.
     series=result
     seriesOrder={['Ball', 'Strike', 'In play']}
     echartsOptions={{
-        series: [{ symbol: 'emptyCircle' }, { symbol: 'circle' }, { symbol: 'triangle' }],
+        series: [{ symbol: 'emptyCircle' }, { symbol: 'circle' }, { symbol: 'triangle' }, { z: 10 }],
         legend: { data: [
             { name: 'Ball', icon: 'emptyCircle' },
             { name: 'Strike', icon: 'circle' },
