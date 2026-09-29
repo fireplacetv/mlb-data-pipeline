@@ -146,6 +146,25 @@ jobs:
           clean-exclude: pr-preview/
           force: false
 
+      # GitHub Pages runs Jekyll on the branch unless its root has a .nojekyll file, and
+      # Jekyll drops folders starting with "_", which is where Evidence puts its CSS and JS
+      # (_app/). Neither deploy Action adds the file at the branch root, and the main deploy
+      # cleans it away, so add it back after every deploy.
+      - name: Turn off Jekyll on gh-pages
+        run: |
+          git fetch --depth 1 origin gh-pages
+          if git cat-file -e origin/gh-pages:.nojekyll 2>/dev/null; then
+            exit 0
+          fi
+          git worktree add --detach "$RUNNER_TEMP/gh-pages" origin/gh-pages
+          cd "$RUNNER_TEMP/gh-pages"
+          touch .nojekyll
+          git add .nojekyll
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Add .nojekyll so GitHub Pages serves _app/"
+          git push origin HEAD:gh-pages
+
       - name: Link the report
         env:
           REPORT_URL: >-

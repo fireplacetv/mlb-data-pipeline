@@ -315,6 +315,8 @@ docker compose run --rm pipeline ruff format .
    - **On a PR:** to `https://<owner>.github.io/<repo>/pr-preview/pr-<N>/`. A bot comment on the PR links to it (with a QR code), updated on every push. `.github/workflows/report-preview-cleanup.yml` deletes the preview when the PR closes. PRs from forks don't get a preview.
    - **On `main`:** to `https://<owner>.github.io/<repo>/`, leaving the PR previews in place.
 
+   After publishing, the job adds a `.nojekyll` file to the branch root if it's missing. Without it, Pages runs Jekyll, which skips folders starting with `_`, and the report loads with no styles or charts (Evidence's CSS and JS are in `_app/`).
+
    The job summary of `publish-report` also has the link. GitHub Pages can take a minute or two to update after the job finishes.
 
 **One-time repository setup for the report:** after the first CI run has created the `gh-pages` branch, set **Settings → Pages → Build and deployment → Source** to **Deploy from a branch**, branch `gh-pages`, folder `/ (root)`. (Not "GitHub Actions": the preview Action pushes to the branch.) The workflows ask for write access themselves, so the default workflow permissions can stay read-only. The site is public, even for a private repository on a plan that allows Pages.

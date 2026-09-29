@@ -117,7 +117,8 @@ where plate_x is not null
 ```
 
 Where each pitch crossed the plate, from the catcher's view (feet). The box is a typical strike
-zone. Balls should mostly land outside it, and strikes and balls in play inside or near it.
+zone. Balls (hollow circles) should mostly land outside it, and strikes (dots) and balls in
+play (triangles) inside or near it.
 
 <ScatterPlot
     data={locations}
@@ -125,12 +126,20 @@ zone. Balls should mostly land outside it, and strikes and balls in play inside 
     y=plate_z
     series=result
     seriesOrder={['Ball', 'Strike', 'In play']}
+    echartsOptions={{
+        series: [{ symbol: 'emptyCircle' }, { symbol: 'circle' }, { symbol: 'triangle' }],
+        legend: { data: [
+            { name: 'Ball', icon: 'emptyCircle' },
+            { name: 'Strike', icon: 'circle' },
+            { name: 'In play', icon: 'triangle' }
+        ] }
+    }}
     xMin={-2.5}
     xMax={2.5}
     yMin={-0.5}
     yMax={5.5}
-    pointSize={3}
-    opacity={0.6}
+    pointSize={4}
+    opacity={0.7}
     chartAreaHeight={380}
     xAxisTitle="horizontal (ft)"
     yAxisTitle="height (ft)"
@@ -200,8 +209,8 @@ where pitch_result_type = 'X'
     and bb_type is not null
 ```
 
-Ground balls should have negative launch angles, line drives roughly 10 to 25 degrees, and fly
-balls higher. Exit velocities top out around 115 mph.
+Ground balls (dots) should have negative launch angles, line drives (triangles) roughly 10 to
+25 degrees, and fly balls (hollow circles) higher. Exit velocities top out around 115 mph.
 
 <ScatterPlot
     data={batted_balls}
@@ -209,6 +218,14 @@ balls higher. Exit velocities top out around 115 mph.
     y=launch_speed
     series=batted_ball
     seriesOrder={['Ground ball', 'Line drive', 'Fly ball or popup']}
+    echartsOptions={{
+        series: [{ symbol: 'circle' }, { symbol: 'triangle' }, { symbol: 'emptyCircle' }],
+        legend: { data: [
+            { name: 'Ground ball', icon: 'circle' },
+            { name: 'Line drive', icon: 'triangle' },
+            { name: 'Fly ball or popup', icon: 'emptyCircle' }
+        ] }
+    }}
     pointSize={5}
     xAxisTitle="launch angle (degrees)"
     yAxisTitle="exit velocity (mph)"
@@ -223,6 +240,14 @@ look like a baseball field: ground balls close in, fly balls to the outfield.
     y=hc_y_up
     series=batted_ball
     seriesOrder={['Ground ball', 'Line drive', 'Fly ball or popup']}
+    echartsOptions={{
+        series: [{ symbol: 'circle' }, { symbol: 'triangle' }, { symbol: 'emptyCircle' }],
+        legend: { data: [
+            { name: 'Ground ball', icon: 'circle' },
+            { name: 'Line drive', icon: 'triangle' },
+            { name: 'Fly ball or popup', icon: 'emptyCircle' }
+        ] }
+    }}
     xMin={0}
     xMax={250}
     yMin={0}
