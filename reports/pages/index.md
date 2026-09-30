@@ -6,11 +6,10 @@ title: Staging data smell test
     // Set by CI when it builds the report; a local build has neither.
     const builtAt = import.meta.env.VITE_REPORT_BUILT_AT;
     const gitSha = import.meta.env.VITE_REPORT_GIT_SHA;
-    const commitUrl = import.meta.env.VITE_REPORT_COMMIT_URL;
 </script>
 
 {#if builtAt && gitSha}
-<small>Built {builtAt} from commit <a href={commitUrl}><code>{gitSha.slice(0, 7)}</code></a>.</small>
+<small>Built {builtAt} from commit <code>{gitSha.slice(0, 7)}</code>.</small>
 {:else}
 <small>Local build: no build time or commit recorded.</small>
 {/if}

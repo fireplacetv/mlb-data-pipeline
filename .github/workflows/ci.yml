@@ -86,7 +86,6 @@ jobs:
           docker compose run --rm \
             -e VITE_REPORT_BUILT_AT="$(date -u '+%Y-%m-%d %H:%M UTC')" \
             -e VITE_REPORT_GIT_SHA="$REPORT_GIT_SHA" \
-            -e VITE_REPORT_COMMIT_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$REPORT_GIT_SHA" \
             reports run build
 
       - name: Upload data report
