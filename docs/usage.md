@@ -222,7 +222,7 @@ docker compose run --rm dbt docs serve  # In a separate terminal to see them loc
 
 ## Data Report
 
-`reports/` is an [Evidence](https://github.com/evidence-dev/evidence) project: one page of charts and tables over the staging layer, for smell-testing what landed. CI builds it for every PR (see "Continuous Integration"); you can also build it or run it live from your own warehouse. It runs in the `reports` service (a `node` image), not the Python image.
+`reports/` is an [Evidence](https://github.com/evidence-dev/evidence) project: one page of scores, standings and row counts over the staging layer, for smell-testing what landed. CI builds it for every PR (see "Continuous Integration"); you can also build it or run it live from your own warehouse. It runs in the `reports` service (a `node` image), not the Python image.
 
 Install its packages once (and again after `reports/package-lock.json` changes). They go in `reports/node_modules/`:
 
@@ -245,13 +245,14 @@ docker compose run --rm --service-ports reports run dev
 **Before either:** build the warehouse with `dbt build`, and don't have dbt running at the same time. Both commands first run `evidence sources`, which opens `data/warehouse/mlb.duckdb` read-only and runs each query in `reports/sources/warehouse/` against it. To pick up new data, run the command again.
 
 **What's on the page**, top to bottom:
-- Totals, and alerts for empty models or final games with no Statcast pitches.
-- Each game with its pitch and boxscore counts, against the typical 250 to 350 pitches.
-- Pitch locations colored by result (ball, strike, in play) around a strike zone, velocity by pitch type, and pitch mix.
-- Exit velocity by launch angle, and a spray chart.
+- When it was built and from which commit (a PR's head commit). CI passes these in as `VITE_REPORT_BUILT_AT` and `VITE_REPORT_GIT_SHA`. The SHA isn't a link: the build's link check treats a link to github.com as a page inside the site and fails; a local build says it has neither.
+- The dates loaded, and alerts for empty models or final games with no Statcast pitches.
+- Scores: each game's final score (or its status, if not final), with its pitch and boxscore counts (a typical game has 250 to 350 pitches).
+- Standings by division as of the last date loaded: wins, losses, winning percentage, games back and streak.
 - Rows and dates per model.
-- Every column of every model with its type and null rate, most-null first, searchable.
-- Collapsed: the completed dlt loads and 100 sample pitches.
+- Columns that are null in every row. CI loads the same day every time, so a new entry here usually means the source renamed or dropped a field.
+
+It shows no individual pitches or batted balls, which keeps the site small.
 
 **Changing it:** source queries (`reports/sources/warehouse/*.sql`) read `staging.*` in DuckDB SQL; each becomes a table `warehouse.<file name>` that the page's SQL blocks query. Both builds run in strict mode, so a failing query fails the build. The page uses the Svelte-style syntax of the open-source Evidence, for example `<BarChart data={games} x=matchup y=pitches />`; see its [component docs](https://docs.evidence.dev/components/all-components). (Evidence's newer hosted product uses a different syntax and isn't used here; see `ARCHITECTURE.md` §9.3.)
 
@@ -307,12 +308,12 @@ docker compose run --rm pipeline ruff format .
 
 1. Writes `.env` from `.env.example` with `UID`/`GID` set to the runner user, so the container can write to the bind-mounted `data/`.
 2. Runs `docker compose build`.
-3. Runs both dlt pipelines against the live sources for one fixed day (`INGEST_START`/`INGEST_END` at the top of the workflow, currently `2025-09-01`). A pipeline whose module doesn't exist yet is skipped with a warning annotation.
+3. Runs both dlt pipelines against the live sources for one fixed day: `2025-09-01`, unless the `CI_INGEST_DATE` repository variable is set (see "Changing the CI date" below). A pipeline whose module doesn't exist yet is skipped with a warning annotation.
 4. Runs `dbt run` and then `dbt test` on that day's data, which checks the staging column lists and tests against real API responses (unit tests use hand-written fixtures). They're separate steps so a model error and a test failure show up separately, and a failing test doesn't stop other models from building.
 5. Builds the data report (see "Data Report") if `dbt run` succeeded, even when `dbt test` failed, and uploads it as the `data-report` artifact.
 6. Uploads `data/logs/` and `dbt/logs/` as the `logs` artifact, even on failure.
 7. In a separate `publish-report` job, publishes the report to GitHub Pages on the `gh-pages` branch:
-   - **On a PR:** to `https://<owner>.github.io/<repo>/pr-preview/pr-<N>/`. A bot comment on the PR links to it (with a QR code), updated on every push. `.github/workflows/report-preview-cleanup.yml` deletes the preview when the PR closes. PRs from forks don't get a preview.
+   - **On a PR:** to `https://<owner>.github.io/<repo>/pr-preview/pr-<N>/`. A bot comment on the PR links to it, updated on every push. `.github/workflows/report-preview-cleanup.yml` deletes the preview when the PR closes. PRs from forks don't get a preview.
    - **On `main`:** to `https://<owner>.github.io/<repo>/`, leaving the PR previews in place.
 
    After publishing, the job adds a `.nojekyll` file to the branch root if it's missing. Without it, Pages runs Jekyll, which skips folders starting with `_`, and the report loads with no styles or charts (Evidence's CSS and JS are in `_app/`).
@@ -321,7 +322,9 @@ docker compose run --rm pipeline ruff format .
 
 **One-time repository setup for the report:** after the first CI run has created the `gh-pages` branch, set **Settings → Pages → Build and deployment → Source** to **Deploy from a branch**, branch `gh-pages`, folder `/ (root)`. (Not "GitHub Actions": the preview Action pushes to the branch.) The workflows ask for write access themselves, so the default workflow permissions can stay read-only. The site is public, even for a private repository on a plan that allows Pages.
 
-To reproduce CI locally:
+**Changing the CI date:** set a repository variable named `CI_INGEST_DATE` to a day in `YYYY-MM-DD` form under **Settings → Secrets and variables → Actions → Variables**. Every later CI run, on PRs and on `main`, loads that day instead of `2025-09-01`, and the report shows it. Delete the variable to go back to the default. Pick an in-season day whose games are all final; an off day loads no games, and the report flags the empty models. A malformed date fails the ingest step.
+
+To reproduce CI locally (with your date in place of `2025-09-01` if you set `CI_INGEST_DATE`):
 
 ```bash
 docker compose build

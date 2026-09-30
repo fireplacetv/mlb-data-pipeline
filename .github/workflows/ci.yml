@@ -13,9 +13,10 @@ permissions:
   contents: read
 
 env:
-  # One known in-season day keeps the live ingest small and deterministic.
-  INGEST_START: "2025-09-01"
-  INGEST_END: "2025-09-01"
+  # One known in-season day keeps the live ingest small and deterministic. To load a different
+  # day, set the CI_INGEST_DATE repository variable (YYYY-MM-DD); unset, CI uses 2025-09-01.
+  INGEST_START: ${{ vars.CI_INGEST_DATE || '2025-09-01' }}
+  INGEST_END: ${{ vars.CI_INGEST_DATE || '2025-09-01' }}
 
 jobs:
   pipeline:
@@ -72,6 +73,8 @@ jobs:
         id: report
         if: ${{ !cancelled() && steps.dbt_run.outcome == 'success' }}
         env:
+          # A PR's head commit, not the merge commit GitHub tests it as.
+          REPORT_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           REPORT_BASE_PATH: >-
             ${{ github.event_name == 'pull_request'
               && format('/{0}/pr-preview/pr-{1}', github.event.repository.name, github.event.number)
@@ -79,7 +82,11 @@ jobs:
         run: |
           printf '\ndeployment:\n  basePath: %s\n' "$REPORT_BASE_PATH" >> reports/evidence.config.yaml
           docker compose run --rm reports ci
-          docker compose run --rm reports run build
+          # Evidence passes VITE_* variables to the page, which stamps the build time and commit.
+          docker compose run --rm \
+            -e VITE_REPORT_BUILT_AT="$(date -u '+%Y-%m-%d %H:%M UTC')" \
+            -e VITE_REPORT_GIT_SHA="$REPORT_GIT_SHA" \
+            reports run build
 
       - name: Upload data report
         if: ${{ !cancelled() && steps.report.outcome == 'success' }}
@@ -135,6 +142,7 @@ jobs:
           preview-branch: gh-pages
           umbrella-dir: pr-preview
           action: deploy
+          qr-code: false
 
       - name: Publish main report
         if: github.event_name == 'push'
