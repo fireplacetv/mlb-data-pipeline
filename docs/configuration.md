@@ -202,10 +202,12 @@ environment:
   DBT_PROFILES_DIR: /app/dbt
   DBT_PROJECT_DIR: /app/dbt
   TZ: America/Los_Angeles
+  USER: ${USER}
 ```
 
 - **`MLB_DATA_DIR: /data`:** Inside the container, the bind-mounted `./data/` is at `/data`. Pipelines write there.
 - **`DBT_PROFILES_DIR` and `DBT_PROJECT_DIR`:** dbt looks here for `profiles.yml` and `dbt_project.yml`.
+- **`USER: ${USER:-dev}`:** Passes your host machine's username to the container for developer-specific schema naming in dev mode (e.g., `dbt_derrick_staging`). Defaults to `dev` if `$USER` is not set. This variable is typically set automatically in your shell on Linux and macOS.
 
 The `dbt` service's entrypoint runs `mkdir -p "$MLB_DATA_DIR/warehouse"` and then `dbt` with your arguments (`build` when none are given). DuckDB won't create a missing folder for its database file, and `data/warehouse` is meant to be deletable.
 - **`TZ: America/Los_Angeles`:** For consistency (MLB games are in various US timezones, but most operations treat times as Pacific). Override if needed.
