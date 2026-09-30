@@ -142,6 +142,7 @@ jobs:
           preview-branch: gh-pages
           umbrella-dir: pr-preview
           action: deploy
+          qr-code: false
 
       - name: Publish main report
         if: github.event_name == 'push'

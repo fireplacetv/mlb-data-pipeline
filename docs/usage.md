@@ -313,7 +313,7 @@ docker compose run --rm pipeline ruff format .
 5. Builds the data report (see "Data Report") if `dbt run` succeeded, even when `dbt test` failed, and uploads it as the `data-report` artifact.
 6. Uploads `data/logs/` and `dbt/logs/` as the `logs` artifact, even on failure.
 7. In a separate `publish-report` job, publishes the report to GitHub Pages on the `gh-pages` branch:
-   - **On a PR:** to `https://<owner>.github.io/<repo>/pr-preview/pr-<N>/`. A bot comment on the PR links to it (with a QR code), updated on every push. `.github/workflows/report-preview-cleanup.yml` deletes the preview when the PR closes. PRs from forks don't get a preview.
+   - **On a PR:** to `https://<owner>.github.io/<repo>/pr-preview/pr-<N>/`. A bot comment on the PR links to it, updated on every push. `.github/workflows/report-preview-cleanup.yml` deletes the preview when the PR closes. PRs from forks don't get a preview.
    - **On `main`:** to `https://<owner>.github.io/<repo>/`, leaving the PR previews in place.
 
    After publishing, the job adds a `.nojekyll` file to the branch root if it's missing. Without it, Pages runs Jekyll, which skips folders starting with `_`, and the report loads with no styles or charts (Evidence's CSS and JS are in `_app/`).
