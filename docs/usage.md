@@ -307,7 +307,7 @@ docker compose run --rm pipeline ruff format .
 
 1. Writes `.env` from `.env.example` with `UID`/`GID` set to the runner user, so the container can write to the bind-mounted `data/`.
 2. Runs `docker compose build`.
-3. Runs both dlt pipelines against the live sources for one fixed day (`INGEST_START`/`INGEST_END` at the top of the workflow, currently `2025-09-01`). A pipeline whose module doesn't exist yet is skipped with a warning annotation.
+3. Runs both dlt pipelines against the live sources for one fixed day: `2025-09-01`, unless the `CI_INGEST_DATE` repository variable is set (see "Changing the CI date" below). A pipeline whose module doesn't exist yet is skipped with a warning annotation.
 4. Runs `dbt run` and then `dbt test` on that day's data, which checks the staging column lists and tests against real API responses (unit tests use hand-written fixtures). They're separate steps so a model error and a test failure show up separately, and a failing test doesn't stop other models from building.
 5. Builds the data report (see "Data Report") if `dbt run` succeeded, even when `dbt test` failed, and uploads it as the `data-report` artifact.
 6. Uploads `data/logs/` and `dbt/logs/` as the `logs` artifact, even on failure.
@@ -321,7 +321,9 @@ docker compose run --rm pipeline ruff format .
 
 **One-time repository setup for the report:** after the first CI run has created the `gh-pages` branch, set **Settings → Pages → Build and deployment → Source** to **Deploy from a branch**, branch `gh-pages`, folder `/ (root)`. (Not "GitHub Actions": the preview Action pushes to the branch.) The workflows ask for write access themselves, so the default workflow permissions can stay read-only. The site is public, even for a private repository on a plan that allows Pages.
 
-To reproduce CI locally:
+**Changing the CI date:** set a repository variable named `CI_INGEST_DATE` to a day in `YYYY-MM-DD` form under **Settings → Secrets and variables → Actions → Variables**. Every later CI run, on PRs and on `main`, loads that day instead of `2025-09-01`, and the report shows it. Delete the variable to go back to the default. Pick an in-season day whose games are all final; an off day loads no games, and the report flags the empty models. A malformed date fails the ingest step.
+
+To reproduce CI locally (with your date in place of `2025-09-01` if you set `CI_INGEST_DATE`):
 
 ```bash
 docker compose build

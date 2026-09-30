@@ -13,9 +13,10 @@ permissions:
   contents: read
 
 env:
-  # One known in-season day keeps the live ingest small and deterministic.
-  INGEST_START: "2025-09-01"
-  INGEST_END: "2025-09-01"
+  # One known in-season day keeps the live ingest small and deterministic. To load a different
+  # day, set the CI_INGEST_DATE repository variable (YYYY-MM-DD); unset, CI uses 2025-09-01.
+  INGEST_START: ${{ vars.CI_INGEST_DATE || '2025-09-01' }}
+  INGEST_END: ${{ vars.CI_INGEST_DATE || '2025-09-01' }}
 
 jobs:
   pipeline:
