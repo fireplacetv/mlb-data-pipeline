@@ -17,7 +17,7 @@ Phase 0 delivers a working pipeline but requires manual runs and local storage. 
 - **Orchestration:** GitHub Actions for daily scheduled runs (cron via Actions workflow).
 - **Secrets management:** GitHub Actions Secrets for R2 credentials (access key, secret key).
 - **Flexibility:** Environment variables (`BUCKET_URL`, `IS_PROD`) allow swapping storage per environment (R2 in prod, local in CI) without code changes.
-- **DuckDB warehouse:** stays local for now (shared cloud warehouse deferred to later phase).
+- **DuckDB warehouse:** the warehouse stays env-driven the same way the lake does, not a shared cloud database. In CI, `mlb.duckdb` is built and read fully locally under `data/warehouse/` — no network, per the project's no-network-in-tests rule. In the GitHub Actions prod run, `dbt build` still runs against a local `.duckdb` file on the runner (DuckDB has no server mode to write to remotely) — rebuilt from the R2 lake each run, per principle 2 (the warehouse is disposable). After `dbt build`, the workflow uploads that file to the R2 bucket as a single object (e.g. `aws s3 cp --endpoint-url <r2-endpoint>`), so the built warehouse persists past the ephemeral runner and is available for the Evidence report build and any other consumer, without needing R2 read access itself. This stays single-writer, one build at a time; no concurrent-access warehouse is introduced.
 
 ### Out of scope
 - Delta Lake table format (deferred; Parquet + staging dedup remains sufficient).
@@ -120,6 +120,14 @@ Update §9 (Environment) to include the scheduled-ingest workflow and GitHub Act
 ### P2M3 — Delta Lake (deferred)
 
 **Goal:** switch dlt to Delta Lake table format for true ACID merges in the cloud lake (optional, deferred until Parquet + staging dedup shows a need).
+
+**Benefit assessment: no meaningful benefit to this project today, so it stays deferred.** Delta Lake's value is atomic multi-file merges and time travel on the lake itself. This pipeline doesn't need that:
+- Principle 3 (idempotent loads) is already satisfied by plain `append` + staging-level dedup (§7.3) — re-running a load for any date range is safe without a lake-level merge.
+- `merge` on the filesystem destination already silently falls back to `append` (§6.2, "No merge on plain Parquet"), so there's no ACID-merge capability being left on the table by staying on Parquet.
+- There's a single writer (one scheduled run at a time) and no concurrent-write scenario for Delta's transaction log to arbitrate.
+- Delta Lake would add a dependency (`deltalake`/`delta-rs`) and a less mature DuckDB read path than native Parquet, for a capability (safe concurrent merges, time travel) this single-user, single-writer pipeline doesn't use.
+
+Revisit only if the project moves to multiple concurrent writers, needs lake-level (not staging-level) deduplication, or wants time-travel/rollback on raw data — none of which are in scope for Phase 2.
 
 **Notes:** Skip for now. Parquet + staging deduplication is sufficient at current scale. Revisit when cloud lake grows or multi-writer scenarios arise.
 
