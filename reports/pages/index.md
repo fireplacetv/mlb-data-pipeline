@@ -4,7 +4,7 @@ title: Staging data smell test
 
 What landed in the dbt staging layer. CI builds this page from the day it ingests; locally it
 shows whatever is in `data/warehouse/mlb.duckdb`. The dbt tests are the pass/fail gate; this
-page is for eyeballing volume.
+page is for eyeballing volume, with the day's scores and standings for context.
 
 ```sql window
 select
@@ -48,6 +48,59 @@ Every staging model has rows, and every final game has Statcast pitches.
 </Alert>
 {/if}
 
+## Scores
+
+Every game on the schedule, with how much data landed for it. A regular nine-inning game has
+roughly 250 to 350 pitches, at least 9 batters and 2 pitchers per team, so about 20+ batters and
+4+ pitchers in total. Games that aren't final show their status instead of a score.
+
+```sql games
+select
+    case
+        when coded_game_state in ('F', 'O')
+            then away_team || ' ' || away_score || ' @ ' || home_team || ' ' || home_score
+        else matchup || ' (' || detailed_state || ')'
+    end as game,
+    pitches,
+    batters,
+    pitchers
+from warehouse.games
+order by game_date, matchup
+```
+
+<DataTable data={games} rows=all>
+    <Column id=game />
+    <Column id=pitches contentType=bar barColor="#a8c9f0" />
+    <Column id=batters />
+    <Column id=pitchers />
+</DataTable>
+
+## Standings
+
+```sql standings
+select
+    as_of_date,
+    division_name as division,
+    team_name as team,
+    wins,
+    losses,
+    winning_percentage,
+    games_back,
+    streak_code
+from warehouse.standings
+```
+
+As of <Value data={standings} column=as_of_date emptySet=pass emptyMessage="no standings loaded" />.
+
+<DataTable data={standings} rows=all groupBy=division emptySet=pass emptyMessage="No standings loaded.">
+    <Column id=team />
+    <Column id=wins title="W" />
+    <Column id=losses title="L" />
+    <Column id=winning_percentage title="Pct" fmt="#.000" />
+    <Column id=games_back title="GB" />
+    <Column id=streak_code title="Strk" />
+</DataTable>
+
 ## Rows per model
 
 ```sql row_counts
@@ -67,31 +120,6 @@ order by row_count desc
     <Column id=model />
     <Column id=row_count title="Rows" contentType=bar barColor="#a8c9f0" />
     <Column id=dates />
-</DataTable>
-
-## Games
-
-A regular nine-inning game has roughly 250 to 350 pitches, at least 9 batters and 2 pitchers
-per team, so about 20+ batters and 4+ pitchers in total. Only games that aren't final show a
-status.
-
-```sql games
-select
-    matchup
-        || case when coded_game_state in ('F', 'O') then '' else ' (' || detailed_state || ')' end
-        as game,
-    pitches,
-    batters,
-    pitchers
-from warehouse.games
-order by game_date, matchup
-```
-
-<DataTable data={games} rows=all>
-    <Column id=game />
-    <Column id=pitches contentType=bar barColor="#a8c9f0" />
-    <Column id=batters />
-    <Column id=pitchers />
 </DataTable>
 
 ## Columns with no values

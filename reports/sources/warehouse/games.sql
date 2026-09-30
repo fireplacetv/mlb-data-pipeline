@@ -1,4 +1,5 @@
--- One row per scheduled game, with how many Statcast pitches and boxscore players landed for it.
+-- One row per scheduled game: the score, and how many Statcast pitches and boxscore players
+-- landed for it.
 with pitches as (
     select game_pk, count(*) as pitches
     from staging.stg_statcast__pitches
@@ -27,6 +28,10 @@ select
     g.game_type,
     coalesce(away.abbreviation, g.away_team_name)
         || ' @ ' || coalesce(home.abbreviation, g.home_team_name) as matchup,
+    coalesce(away.abbreviation, g.away_team_name) as away_team,
+    coalesce(home.abbreviation, g.home_team_name) as home_team,
+    g.away_score,
+    g.home_score,
     g.detailed_state,
     g.coded_game_state,
     coalesce(p.pitches, 0) as pitches,

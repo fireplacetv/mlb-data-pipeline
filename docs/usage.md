@@ -222,7 +222,7 @@ docker compose run --rm dbt docs serve  # In a separate terminal to see them loc
 
 ## Data Report
 
-`reports/` is an [Evidence](https://github.com/evidence-dev/evidence) project: one page of counts over the staging layer, for smell-testing what landed. CI builds it for every PR (see "Continuous Integration"); you can also build it or run it live from your own warehouse. It runs in the `reports` service (a `node` image), not the Python image.
+`reports/` is an [Evidence](https://github.com/evidence-dev/evidence) project: one page of scores, standings and row counts over the staging layer, for smell-testing what landed. CI builds it for every PR (see "Continuous Integration"); you can also build it or run it live from your own warehouse. It runs in the `reports` service (a `node` image), not the Python image.
 
 Install its packages once (and again after `reports/package-lock.json` changes). They go in `reports/node_modules/`:
 
@@ -246,11 +246,12 @@ docker compose run --rm --service-ports reports run dev
 
 **What's on the page**, top to bottom:
 - The dates loaded, and alerts for empty models or final games with no Statcast pitches.
+- Scores: each game's final score (or its status, if not final), with its pitch and boxscore counts (a typical game has 250 to 350 pitches).
+- Standings by division as of the last date loaded: wins, losses, winning percentage, games back and streak.
 - Rows and dates per model.
-- Each game with its pitch and boxscore counts (a typical game has 250 to 350 pitches).
 - Columns that are null in every row. CI loads the same day every time, so a new entry here usually means the source renamed or dropped a field.
 
-It shows counts only, no individual pitches or batted balls, which keeps the site small.
+It shows no individual pitches or batted balls, which keeps the site small.
 
 **Changing it:** source queries (`reports/sources/warehouse/*.sql`) read `staging.*` in DuckDB SQL; each becomes a table `warehouse.<file name>` that the page's SQL blocks query. Both builds run in strict mode, so a failing query fails the build. The page uses the Svelte-style syntax of the open-source Evidence, for example `<BarChart data={games} x=matchup y=pitches />`; see its [component docs](https://docs.evidence.dev/components/all-components). (Evidence's newer hosted product uses a different syntax and isn't used here; see `ARCHITECTURE.md` §9.3.)
 
