@@ -65,10 +65,10 @@ jobs:
       # failing test doesn't stop other models from building.
       - name: dbt run
         id: dbt_run
-        run: docker compose run --rm dbt run
+        run: docker compose run --rm -e DBT_OUTPUT_MODE=production dbt run
 
       - name: dbt test
-        run: docker compose run --rm dbt test
+        run: docker compose run --rm -e DBT_OUTPUT_MODE=production dbt test
 
       # The Evidence report (reports/) over the day just built, for a human smell test. Built
       # even when dbt test fails, since that's when a look at the data helps most. The base
