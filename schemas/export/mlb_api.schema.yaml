@@ -1,0 +1,3463 @@
+version: 8
+version_hash: 3kPrxtPX8ToTJ0VmXN9QicUdisARzeSTnR6dVs2k2IE=
+engine_version: 11
+name: mlb_api
+tables:
+  _dlt_version:
+    columns:
+      version:
+        data_type: bigint
+        nullable: false
+      engine_version:
+        data_type: bigint
+        nullable: false
+      inserted_at:
+        data_type: timestamp
+        nullable: false
+      schema_name:
+        data_type: text
+        nullable: false
+      version_hash:
+        data_type: text
+        nullable: false
+      schema:
+        data_type: text
+        nullable: false
+    write_disposition: skip
+    resource: _dlt_version
+    description: Created by DLT. Tracks schema updates
+  _dlt_loads:
+    columns:
+      load_id:
+        data_type: text
+        nullable: false
+        precision: 64
+      schema_name:
+        data_type: text
+        nullable: true
+      status:
+        data_type: bigint
+        nullable: false
+      inserted_at:
+        data_type: timestamp
+        nullable: false
+      schema_version_hash:
+        data_type: text
+        nullable: true
+    write_disposition: skip
+    resource: _dlt_loads
+    description: Created by DLT. Tracks completed loads
+  schedule:
+    columns:
+      game_pk:
+        data_type: bigint
+        nullable: true
+      game_guid:
+        data_type: text
+        nullable: true
+      link:
+        data_type: text
+        nullable: true
+      game_type:
+        data_type: text
+        nullable: true
+      season:
+        data_type: text
+        nullable: true
+      game_date:
+        data_type: timestamp
+        nullable: true
+      official_date:
+        data_type: text
+        nullable: true
+      is_tie:
+        data_type: bool
+        nullable: true
+      game_number:
+        data_type: bigint
+        nullable: true
+      public_facing:
+        data_type: bool
+        nullable: true
+      double_header:
+        data_type: text
+        nullable: true
+      gameday_type:
+        data_type: text
+        nullable: true
+      tiebreaker:
+        data_type: text
+        nullable: true
+      calendar_event_id:
+        data_type: text
+        nullable: true
+      season_display:
+        data_type: text
+        nullable: true
+      day_night:
+        data_type: text
+        nullable: true
+      scheduled_innings:
+        data_type: bigint
+        nullable: true
+      reverse_home_away_status:
+        data_type: bool
+        nullable: true
+      inning_break_length:
+        data_type: bigint
+        nullable: true
+      games_in_series:
+        data_type: bigint
+        nullable: true
+      series_game_number:
+        data_type: bigint
+        nullable: true
+      series_description:
+        data_type: text
+        nullable: true
+      record_source:
+        data_type: text
+        nullable: true
+      if_necessary:
+        data_type: text
+        nullable: true
+      if_necessary_description:
+        data_type: text
+        nullable: true
+      content__link:
+        data_type: text
+        nullable: true
+      venue__id:
+        data_type: bigint
+        nullable: true
+      venue__name:
+        data_type: text
+        nullable: true
+      venue__link:
+        data_type: text
+        nullable: true
+      teams__home__score:
+        data_type: bigint
+        nullable: true
+      teams__home__is_winner:
+        data_type: bool
+        nullable: true
+      teams__home__split_squad:
+        data_type: bool
+        nullable: true
+      teams__home__series_number:
+        data_type: bigint
+        nullable: true
+      teams__home__league_record__wins:
+        data_type: bigint
+        nullable: true
+      teams__home__league_record__losses:
+        data_type: bigint
+        nullable: true
+      teams__home__league_record__ties:
+        data_type: bigint
+        nullable: true
+      teams__home__league_record__pct:
+        data_type: text
+        nullable: true
+      teams__home__team__id:
+        data_type: bigint
+        nullable: true
+      teams__home__team__name:
+        data_type: text
+        nullable: true
+      teams__home__team__link:
+        data_type: text
+        nullable: true
+      teams__away__score:
+        data_type: bigint
+        nullable: true
+      teams__away__is_winner:
+        data_type: bool
+        nullable: true
+      teams__away__split_squad:
+        data_type: bool
+        nullable: true
+      teams__away__series_number:
+        data_type: bigint
+        nullable: true
+      teams__away__league_record__wins:
+        data_type: bigint
+        nullable: true
+      teams__away__league_record__losses:
+        data_type: bigint
+        nullable: true
+      teams__away__league_record__ties:
+        data_type: bigint
+        nullable: true
+      teams__away__league_record__pct:
+        data_type: text
+        nullable: true
+      teams__away__team__id:
+        data_type: bigint
+        nullable: true
+      teams__away__team__name:
+        data_type: text
+        nullable: true
+      teams__away__team__link:
+        data_type: text
+        nullable: true
+      status__abstract_game_state:
+        data_type: text
+        nullable: true
+      status__coded_game_state:
+        data_type: text
+        nullable: true
+      status__detailed_state:
+        data_type: text
+        nullable: true
+      status__status_code:
+        data_type: text
+        nullable: true
+      status__start_time_tbd:
+        data_type: bool
+        nullable: true
+      status__abstract_game_code:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+      rescheduled_from:
+        data_type: timestamp
+        nullable: true
+      rescheduled_from_date:
+        data_type: text
+        nullable: true
+      description:
+        data_type: text
+        nullable: true
+      reschedule_date:
+        data_type: timestamp
+        nullable: true
+      reschedule_game_date:
+        data_type: text
+        nullable: true
+      status__reason:
+        data_type: text
+        nullable: true
+    write_disposition: append
+    file_format: parquet
+    resource: schedule
+    x-normalizer:
+      seen-data: true
+  boxscore:
+    columns:
+      game_pk:
+        data_type: bigint
+        nullable: true
+      copyright:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__fielding__caught_stealing:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__fielding__stolen_bases:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__fielding__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__fielding__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__fielding__assists:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__fielding__put_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__fielding__errors:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__fielding__chances:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__fielding__passed_ball:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__fielding__pickoffs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__fly_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__ground_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__air_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__runs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__doubles:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__triples:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__home_runs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__strike_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__base_on_balls:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__intentional_walks:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__hits:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__at_bats:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__obp:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__pitching__caught_stealing:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__stolen_bases:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__pitching__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__pitching__number_of_pitches:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__era:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__pitching__innings_pitched:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__pitching__save_opportunities:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__earned_runs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__whip:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__pitching__batters_faced:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__complete_games:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__shutouts:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__pitches_thrown:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__balls:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__strikes:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__strike_percentage:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__pitching__hit_batsmen:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__balks:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__wild_pitches:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__pickoffs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__ground_outs_to_airouts:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__pitching__rbi:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__pitches_per_inning:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__pitching__runs_scored_per9:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__pitching__home_runs_per9:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__pitching__inherited_runners:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__inherited_runners_scored:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__catchers_interference:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__sac_bunts:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__sac_flies:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__passed_ball:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__pop_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__pitching__line_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__fly_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__ground_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__air_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__runs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__doubles:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__triples:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__home_runs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__strike_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__base_on_balls:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__intentional_walks:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__hits:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__avg:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__batting__at_bats:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__obp:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__batting__slg:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__batting__ops:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__batting__caught_stealing:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__stolen_bases:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__batting__ground_into_double_play:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__ground_into_triple_play:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__plate_appearances:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__total_bases:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__rbi:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__left_on_base:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__sac_bunts:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__sac_flies:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__catchers_interference:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__pickoffs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__at_bats_per_home_run:
+        data_type: text
+        nullable: true
+      teams__home__team_stats__batting__pop_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team_stats__batting__line_outs:
+        data_type: bigint
+        nullable: true
+      teams__home__team__all_star_status:
+        data_type: text
+        nullable: true
+      teams__home__team__id:
+        data_type: bigint
+        nullable: true
+      teams__home__team__name:
+        data_type: text
+        nullable: true
+      teams__home__team__link:
+        data_type: text
+        nullable: true
+      teams__home__team__season:
+        data_type: bigint
+        nullable: true
+      teams__home__team__team_code:
+        data_type: text
+        nullable: true
+      teams__home__team__file_code:
+        data_type: text
+        nullable: true
+      teams__home__team__abbreviation:
+        data_type: text
+        nullable: true
+      teams__home__team__team_name:
+        data_type: text
+        nullable: true
+      teams__home__team__location_name:
+        data_type: text
+        nullable: true
+      teams__home__team__first_year_of_play:
+        data_type: text
+        nullable: true
+      teams__home__team__short_name:
+        data_type: text
+        nullable: true
+      teams__home__team__franchise_name:
+        data_type: text
+        nullable: true
+      teams__home__team__club_name:
+        data_type: text
+        nullable: true
+      teams__home__team__active:
+        data_type: bool
+        nullable: true
+      teams__home__team__record__games_played:
+        data_type: bigint
+        nullable: true
+      teams__home__team__record__wild_card_games_back:
+        data_type: text
+        nullable: true
+      teams__home__team__record__league_games_back:
+        data_type: text
+        nullable: true
+      teams__home__team__record__spring_league_games_back:
+        data_type: text
+        nullable: true
+      teams__home__team__record__sport_games_back:
+        data_type: text
+        nullable: true
+      teams__home__team__record__division_games_back:
+        data_type: text
+        nullable: true
+      teams__home__team__record__conference_games_back:
+        data_type: text
+        nullable: true
+      teams__home__team__record__division_leader:
+        data_type: bool
+        nullable: true
+      teams__home__team__record__wins:
+        data_type: bigint
+        nullable: true
+      teams__home__team__record__losses:
+        data_type: bigint
+        nullable: true
+      teams__home__team__record__winning_percentage:
+        data_type: text
+        nullable: true
+      teams__home__team__record__league_record__wins:
+        data_type: bigint
+        nullable: true
+      teams__home__team__record__league_record__losses:
+        data_type: bigint
+        nullable: true
+      teams__home__team__record__league_record__ties:
+        data_type: bigint
+        nullable: true
+      teams__home__team__record__league_record__pct:
+        data_type: text
+        nullable: true
+      teams__home__team__sport__id:
+        data_type: bigint
+        nullable: true
+      teams__home__team__sport__link:
+        data_type: text
+        nullable: true
+      teams__home__team__sport__name:
+        data_type: text
+        nullable: true
+      teams__home__team__division__id:
+        data_type: bigint
+        nullable: true
+      teams__home__team__division__name:
+        data_type: text
+        nullable: true
+      teams__home__team__division__link:
+        data_type: text
+        nullable: true
+      teams__home__team__league__id:
+        data_type: bigint
+        nullable: true
+      teams__home__team__league__name:
+        data_type: text
+        nullable: true
+      teams__home__team__league__link:
+        data_type: text
+        nullable: true
+      teams__home__team__spring_venue__id:
+        data_type: bigint
+        nullable: true
+      teams__home__team__spring_venue__link:
+        data_type: text
+        nullable: true
+      teams__home__team__venue__id:
+        data_type: bigint
+        nullable: true
+      teams__home__team__venue__name:
+        data_type: text
+        nullable: true
+      teams__home__team__venue__link:
+        data_type: text
+        nullable: true
+      teams__home__team__spring_league__id:
+        data_type: bigint
+        nullable: true
+      teams__home__team__spring_league__name:
+        data_type: text
+        nullable: true
+      teams__home__team__spring_league__link:
+        data_type: text
+        nullable: true
+      teams__home__team__spring_league__abbreviation:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__fielding__caught_stealing:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__fielding__stolen_bases:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__fielding__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__fielding__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__fielding__assists:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__fielding__put_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__fielding__errors:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__fielding__chances:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__fielding__passed_ball:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__fielding__pickoffs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__fly_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__ground_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__air_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__runs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__doubles:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__triples:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__home_runs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__strike_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__base_on_balls:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__intentional_walks:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__hits:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__at_bats:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__obp:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__pitching__caught_stealing:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__stolen_bases:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__pitching__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__pitching__number_of_pitches:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__era:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__pitching__innings_pitched:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__pitching__save_opportunities:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__earned_runs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__whip:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__pitching__batters_faced:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__complete_games:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__shutouts:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__pitches_thrown:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__balls:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__strikes:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__strike_percentage:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__pitching__hit_batsmen:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__balks:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__wild_pitches:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__pickoffs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__ground_outs_to_airouts:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__pitching__rbi:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__pitches_per_inning:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__pitching__runs_scored_per9:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__pitching__home_runs_per9:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__pitching__inherited_runners:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__inherited_runners_scored:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__catchers_interference:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__sac_bunts:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__sac_flies:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__passed_ball:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__pop_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__pitching__line_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__fly_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__ground_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__air_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__runs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__doubles:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__triples:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__home_runs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__strike_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__base_on_balls:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__intentional_walks:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__hits:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__avg:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__batting__at_bats:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__obp:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__batting__slg:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__batting__ops:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__batting__caught_stealing:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__stolen_bases:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__batting__ground_into_double_play:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__ground_into_triple_play:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__plate_appearances:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__total_bases:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__rbi:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__left_on_base:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__sac_bunts:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__sac_flies:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__catchers_interference:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__pickoffs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__at_bats_per_home_run:
+        data_type: text
+        nullable: true
+      teams__away__team_stats__batting__pop_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team_stats__batting__line_outs:
+        data_type: bigint
+        nullable: true
+      teams__away__team__all_star_status:
+        data_type: text
+        nullable: true
+      teams__away__team__id:
+        data_type: bigint
+        nullable: true
+      teams__away__team__name:
+        data_type: text
+        nullable: true
+      teams__away__team__link:
+        data_type: text
+        nullable: true
+      teams__away__team__season:
+        data_type: bigint
+        nullable: true
+      teams__away__team__team_code:
+        data_type: text
+        nullable: true
+      teams__away__team__file_code:
+        data_type: text
+        nullable: true
+      teams__away__team__abbreviation:
+        data_type: text
+        nullable: true
+      teams__away__team__team_name:
+        data_type: text
+        nullable: true
+      teams__away__team__location_name:
+        data_type: text
+        nullable: true
+      teams__away__team__first_year_of_play:
+        data_type: text
+        nullable: true
+      teams__away__team__short_name:
+        data_type: text
+        nullable: true
+      teams__away__team__franchise_name:
+        data_type: text
+        nullable: true
+      teams__away__team__club_name:
+        data_type: text
+        nullable: true
+      teams__away__team__active:
+        data_type: bool
+        nullable: true
+      teams__away__team__record__games_played:
+        data_type: bigint
+        nullable: true
+      teams__away__team__record__wild_card_games_back:
+        data_type: text
+        nullable: true
+      teams__away__team__record__league_games_back:
+        data_type: text
+        nullable: true
+      teams__away__team__record__spring_league_games_back:
+        data_type: text
+        nullable: true
+      teams__away__team__record__sport_games_back:
+        data_type: text
+        nullable: true
+      teams__away__team__record__division_games_back:
+        data_type: text
+        nullable: true
+      teams__away__team__record__conference_games_back:
+        data_type: text
+        nullable: true
+      teams__away__team__record__division_leader:
+        data_type: bool
+        nullable: true
+      teams__away__team__record__wins:
+        data_type: bigint
+        nullable: true
+      teams__away__team__record__losses:
+        data_type: bigint
+        nullable: true
+      teams__away__team__record__winning_percentage:
+        data_type: text
+        nullable: true
+      teams__away__team__record__league_record__wins:
+        data_type: bigint
+        nullable: true
+      teams__away__team__record__league_record__losses:
+        data_type: bigint
+        nullable: true
+      teams__away__team__record__league_record__ties:
+        data_type: bigint
+        nullable: true
+      teams__away__team__record__league_record__pct:
+        data_type: text
+        nullable: true
+      teams__away__team__sport__id:
+        data_type: bigint
+        nullable: true
+      teams__away__team__sport__link:
+        data_type: text
+        nullable: true
+      teams__away__team__sport__name:
+        data_type: text
+        nullable: true
+      teams__away__team__division__id:
+        data_type: bigint
+        nullable: true
+      teams__away__team__division__name:
+        data_type: text
+        nullable: true
+      teams__away__team__division__link:
+        data_type: text
+        nullable: true
+      teams__away__team__league__id:
+        data_type: bigint
+        nullable: true
+      teams__away__team__league__name:
+        data_type: text
+        nullable: true
+      teams__away__team__league__link:
+        data_type: text
+        nullable: true
+      teams__away__team__spring_venue__id:
+        data_type: bigint
+        nullable: true
+      teams__away__team__spring_venue__link:
+        data_type: text
+        nullable: true
+      teams__away__team__venue__id:
+        data_type: bigint
+        nullable: true
+      teams__away__team__venue__name:
+        data_type: text
+        nullable: true
+      teams__away__team__venue__link:
+        data_type: text
+        nullable: true
+      teams__away__team__spring_league__id:
+        data_type: bigint
+        nullable: true
+      teams__away__team__spring_league__name:
+        data_type: text
+        nullable: true
+      teams__away__team__spring_league__link:
+        data_type: text
+        nullable: true
+      teams__away__team__spring_league__abbreviation:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    write_disposition: append
+    file_format: parquet
+    resource: boxscore
+    x-normalizer:
+      seen-data: true
+  _dlt_pipeline_state:
+    columns:
+      version:
+        data_type: bigint
+        nullable: false
+      engine_version:
+        data_type: bigint
+        nullable: false
+      pipeline_name:
+        data_type: text
+        nullable: false
+      state:
+        data_type: text
+        nullable: false
+      created_at:
+        data_type: timestamp
+        nullable: false
+      version_hash:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+        precision: 64
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    write_disposition: append
+    file_format: preferred
+    resource: _dlt_pipeline_state
+    x-normalizer:
+      seen-data: true
+  boxscore__officials:
+    columns:
+      official_type:
+        data_type: text
+        nullable: true
+      official__id:
+        data_type: bigint
+        nullable: true
+      official__full_name:
+        data_type: text
+        nullable: true
+      official__link:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__info:
+    columns:
+      label:
+        data_type: text
+        nullable: true
+      value:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__top_performers:
+    columns:
+      type:
+        data_type: text
+        nullable: true
+      game_score:
+        data_type: bigint
+        nullable: true
+      hitting_game_score:
+        data_type: bigint
+        nullable: true
+      player__jersey_number:
+        data_type: text
+        nullable: true
+      player__parent_team_id:
+        data_type: bigint
+        nullable: true
+      player__batting_order:
+        data_type: text
+        nullable: true
+      player__game_status__is_current_batter:
+        data_type: bool
+        nullable: true
+      player__game_status__is_current_pitcher:
+        data_type: bool
+        nullable: true
+      player__game_status__is_on_bench:
+        data_type: bool
+        nullable: true
+      player__game_status__is_substitute:
+        data_type: bool
+        nullable: true
+      player__season_stats__fielding__games_started:
+        data_type: bigint
+        nullable: true
+      player__season_stats__fielding__caught_stealing:
+        data_type: bigint
+        nullable: true
+      player__season_stats__fielding__stolen_bases:
+        data_type: bigint
+        nullable: true
+      player__season_stats__fielding__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      player__season_stats__fielding__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      player__season_stats__fielding__assists:
+        data_type: bigint
+        nullable: true
+      player__season_stats__fielding__put_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__fielding__errors:
+        data_type: bigint
+        nullable: true
+      player__season_stats__fielding__chances:
+        data_type: bigint
+        nullable: true
+      player__season_stats__fielding__fielding:
+        data_type: text
+        nullable: true
+      player__season_stats__fielding__passed_ball:
+        data_type: bigint
+        nullable: true
+      player__season_stats__fielding__pickoffs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__games_played:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__games_started:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__fly_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__ground_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__air_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__runs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__doubles:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__triples:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__home_runs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__strike_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__base_on_balls:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__intentional_walks:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__hits:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__at_bats:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__obp:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__caught_stealing:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__stolen_bases:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__number_of_pitches:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__era:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__innings_pitched:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__wins:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__losses:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__saves:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__save_opportunities:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__holds:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__blown_saves:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__earned_runs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__whip:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__batters_faced:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__games_pitched:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__complete_games:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__shutouts:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__balls:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__strikes:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__strike_percentage:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__hit_batsmen:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__balks:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__wild_pitches:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__pickoffs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__ground_outs_to_airouts:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__rbi:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__win_percentage:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__pitches_per_inning:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__games_finished:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__strikeout_walk_ratio:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__strikeouts_per9_inn:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__walks_per9_inn:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__hits_per9_inn:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__runs_scored_per9:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__home_runs_per9:
+        data_type: text
+        nullable: true
+      player__season_stats__pitching__inherited_runners:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__inherited_runners_scored:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__catchers_interference:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__sac_bunts:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__sac_flies:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__passed_ball:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__pop_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__line_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__games_played:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__fly_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__ground_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__air_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__runs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__doubles:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__triples:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__home_runs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__strike_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__base_on_balls:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__intentional_walks:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__hits:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__avg:
+        data_type: text
+        nullable: true
+      player__season_stats__batting__at_bats:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__obp:
+        data_type: text
+        nullable: true
+      player__season_stats__batting__slg:
+        data_type: text
+        nullable: true
+      player__season_stats__batting__ops:
+        data_type: text
+        nullable: true
+      player__season_stats__batting__caught_stealing:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__stolen_bases:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      player__season_stats__batting__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      player__season_stats__batting__ground_into_double_play:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__ground_into_triple_play:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__plate_appearances:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__total_bases:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__rbi:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__left_on_base:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__sac_bunts:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__sac_flies:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__babip:
+        data_type: text
+        nullable: true
+      player__season_stats__batting__ground_outs_to_airouts:
+        data_type: text
+        nullable: true
+      player__season_stats__batting__catchers_interference:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__pickoffs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__at_bats_per_home_run:
+        data_type: text
+        nullable: true
+      player__season_stats__batting__pop_outs:
+        data_type: bigint
+        nullable: true
+      player__season_stats__batting__line_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__fielding__games_started:
+        data_type: bigint
+        nullable: true
+      player__stats__fielding__caught_stealing:
+        data_type: bigint
+        nullable: true
+      player__stats__fielding__stolen_bases:
+        data_type: bigint
+        nullable: true
+      player__stats__fielding__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      player__stats__fielding__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      player__stats__fielding__assists:
+        data_type: bigint
+        nullable: true
+      player__stats__fielding__put_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__fielding__errors:
+        data_type: bigint
+        nullable: true
+      player__stats__fielding__chances:
+        data_type: bigint
+        nullable: true
+      player__stats__fielding__fielding:
+        data_type: text
+        nullable: true
+      player__stats__fielding__passed_ball:
+        data_type: bigint
+        nullable: true
+      player__stats__fielding__pickoffs:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__summary:
+        data_type: text
+        nullable: true
+      player__stats__batting__games_played:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__fly_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__ground_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__air_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__runs:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__doubles:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__triples:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__home_runs:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__strike_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__base_on_balls:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__intentional_walks:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__hits:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__at_bats:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__caught_stealing:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__stolen_bases:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      player__stats__batting__ground_into_double_play:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__ground_into_triple_play:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__plate_appearances:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__total_bases:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__rbi:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__left_on_base:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__sac_bunts:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__sac_flies:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__catchers_interference:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__pickoffs:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__at_bats_per_home_run:
+        data_type: text
+        nullable: true
+      player__stats__batting__pop_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__batting__line_outs:
+        data_type: bigint
+        nullable: true
+      player__status__code:
+        data_type: text
+        nullable: true
+      player__status__description:
+        data_type: text
+        nullable: true
+      player__position__code:
+        data_type: text
+        nullable: true
+      player__position__name:
+        data_type: text
+        nullable: true
+      player__position__type:
+        data_type: text
+        nullable: true
+      player__position__abbreviation:
+        data_type: text
+        nullable: true
+      player__person__id:
+        data_type: bigint
+        nullable: true
+      player__person__full_name:
+        data_type: text
+        nullable: true
+      player__person__link:
+        data_type: text
+        nullable: true
+      player__person__boxscore_name:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+      pitching_game_score:
+        data_type: bigint
+        nullable: true
+      player__season_stats__pitching__pitches_thrown:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__summary:
+        data_type: text
+        nullable: true
+      player__stats__pitching__games_played:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__games_started:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__fly_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__ground_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__air_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__runs:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__doubles:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__triples:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__home_runs:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__strike_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__base_on_balls:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__intentional_walks:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__hits:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__at_bats:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__caught_stealing:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__stolen_bases:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      player__stats__pitching__number_of_pitches:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__innings_pitched:
+        data_type: text
+        nullable: true
+      player__stats__pitching__wins:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__losses:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__saves:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__save_opportunities:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__holds:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__blown_saves:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__earned_runs:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__batters_faced:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__outs:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__games_pitched:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__complete_games:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__shutouts:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__pitches_thrown:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__balls:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__strikes:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__strike_percentage:
+        data_type: text
+        nullable: true
+      player__stats__pitching__hit_batsmen:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__balks:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__wild_pitches:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__pickoffs:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__rbi:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__games_finished:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__runs_scored_per9:
+        data_type: text
+        nullable: true
+      player__stats__pitching__home_runs_per9:
+        data_type: text
+        nullable: true
+      player__stats__pitching__inherited_runners:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__inherited_runners_scored:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__catchers_interference:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__sac_bunts:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__sac_flies:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__passed_ball:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__pop_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__line_outs:
+        data_type: bigint
+        nullable: true
+      player__stats__pitching__note:
+        data_type: text
+        nullable: true
+      player__stats__batting__note:
+        data_type: text
+        nullable: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__top_performers__player__all_positions:
+    columns:
+      code:
+        data_type: text
+        nullable: true
+      name:
+        data_type: text
+        nullable: true
+      type:
+        data_type: text
+        nullable: true
+      abbreviation:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore__top_performers
+    x-normalizer:
+      seen-data: true
+  boxscore__players:
+    columns:
+      game_pk:
+        data_type: bigint
+        nullable: true
+      team_id:
+        data_type: bigint
+        nullable: true
+      side:
+        data_type: text
+        nullable: true
+      jersey_number:
+        data_type: text
+        nullable: true
+      parent_team_id:
+        data_type: bigint
+        nullable: true
+      batting_order:
+        data_type: text
+        nullable: true
+      game_status__is_current_batter:
+        data_type: bool
+        nullable: true
+      game_status__is_current_pitcher:
+        data_type: bool
+        nullable: true
+      game_status__is_on_bench:
+        data_type: bool
+        nullable: true
+      game_status__is_substitute:
+        data_type: bool
+        nullable: true
+      season_stats__fielding__caught_stealing:
+        data_type: bigint
+        nullable: true
+      season_stats__fielding__stolen_bases:
+        data_type: bigint
+        nullable: true
+      season_stats__fielding__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      season_stats__fielding__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      season_stats__fielding__assists:
+        data_type: bigint
+        nullable: true
+      season_stats__fielding__put_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__fielding__errors:
+        data_type: bigint
+        nullable: true
+      season_stats__fielding__chances:
+        data_type: bigint
+        nullable: true
+      season_stats__fielding__fielding:
+        data_type: text
+        nullable: true
+      season_stats__fielding__passed_ball:
+        data_type: bigint
+        nullable: true
+      season_stats__fielding__pickoffs:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__games_played:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__games_started:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__fly_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__ground_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__air_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__runs:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__doubles:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__triples:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__home_runs:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__strike_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__base_on_balls:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__intentional_walks:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__hits:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__at_bats:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__obp:
+        data_type: text
+        nullable: true
+      season_stats__pitching__caught_stealing:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__stolen_bases:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      season_stats__pitching__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      season_stats__pitching__number_of_pitches:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__era:
+        data_type: text
+        nullable: true
+      season_stats__pitching__innings_pitched:
+        data_type: text
+        nullable: true
+      season_stats__pitching__wins:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__losses:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__saves:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__save_opportunities:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__holds:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__blown_saves:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__earned_runs:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__whip:
+        data_type: text
+        nullable: true
+      season_stats__pitching__batters_faced:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__outs:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__games_pitched:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__complete_games:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__shutouts:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__balls:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__strikes:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__strike_percentage:
+        data_type: text
+        nullable: true
+      season_stats__pitching__hit_batsmen:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__balks:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__wild_pitches:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__pickoffs:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__ground_outs_to_airouts:
+        data_type: text
+        nullable: true
+      season_stats__pitching__rbi:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__win_percentage:
+        data_type: text
+        nullable: true
+      season_stats__pitching__pitches_per_inning:
+        data_type: text
+        nullable: true
+      season_stats__pitching__games_finished:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__strikeout_walk_ratio:
+        data_type: text
+        nullable: true
+      season_stats__pitching__strikeouts_per9_inn:
+        data_type: text
+        nullable: true
+      season_stats__pitching__walks_per9_inn:
+        data_type: text
+        nullable: true
+      season_stats__pitching__hits_per9_inn:
+        data_type: text
+        nullable: true
+      season_stats__pitching__runs_scored_per9:
+        data_type: text
+        nullable: true
+      season_stats__pitching__home_runs_per9:
+        data_type: text
+        nullable: true
+      season_stats__pitching__inherited_runners:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__inherited_runners_scored:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__catchers_interference:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__sac_bunts:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__sac_flies:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__passed_ball:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__pop_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__pitching__line_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__games_played:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__fly_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__ground_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__air_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__runs:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__doubles:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__triples:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__home_runs:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__strike_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__base_on_balls:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__intentional_walks:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__hits:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__avg:
+        data_type: text
+        nullable: true
+      season_stats__batting__at_bats:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__obp:
+        data_type: text
+        nullable: true
+      season_stats__batting__slg:
+        data_type: text
+        nullable: true
+      season_stats__batting__ops:
+        data_type: text
+        nullable: true
+      season_stats__batting__caught_stealing:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__stolen_bases:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      season_stats__batting__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      season_stats__batting__ground_into_double_play:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__ground_into_triple_play:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__plate_appearances:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__total_bases:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__rbi:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__left_on_base:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__sac_bunts:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__sac_flies:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__babip:
+        data_type: text
+        nullable: true
+      season_stats__batting__ground_outs_to_airouts:
+        data_type: text
+        nullable: true
+      season_stats__batting__catchers_interference:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__pickoffs:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__at_bats_per_home_run:
+        data_type: text
+        nullable: true
+      season_stats__batting__pop_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__batting__line_outs:
+        data_type: bigint
+        nullable: true
+      stats__fielding__caught_stealing:
+        data_type: bigint
+        nullable: true
+      stats__fielding__stolen_bases:
+        data_type: bigint
+        nullable: true
+      stats__fielding__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      stats__fielding__caught_stealing_percentage:
+        data_type: text
+        nullable: true
+      stats__fielding__assists:
+        data_type: bigint
+        nullable: true
+      stats__fielding__put_outs:
+        data_type: bigint
+        nullable: true
+      stats__fielding__errors:
+        data_type: bigint
+        nullable: true
+      stats__fielding__chances:
+        data_type: bigint
+        nullable: true
+      stats__fielding__fielding:
+        data_type: text
+        nullable: true
+      stats__fielding__passed_ball:
+        data_type: bigint
+        nullable: true
+      stats__fielding__pickoffs:
+        data_type: bigint
+        nullable: true
+      stats__batting__note:
+        data_type: text
+        nullable: true
+      stats__batting__summary:
+        data_type: text
+        nullable: true
+      stats__batting__games_played:
+        data_type: bigint
+        nullable: true
+      stats__batting__fly_outs:
+        data_type: bigint
+        nullable: true
+      stats__batting__ground_outs:
+        data_type: bigint
+        nullable: true
+      stats__batting__air_outs:
+        data_type: bigint
+        nullable: true
+      stats__batting__runs:
+        data_type: bigint
+        nullable: true
+      stats__batting__doubles:
+        data_type: bigint
+        nullable: true
+      stats__batting__triples:
+        data_type: bigint
+        nullable: true
+      stats__batting__home_runs:
+        data_type: bigint
+        nullable: true
+      stats__batting__strike_outs:
+        data_type: bigint
+        nullable: true
+      stats__batting__base_on_balls:
+        data_type: bigint
+        nullable: true
+      stats__batting__intentional_walks:
+        data_type: bigint
+        nullable: true
+      stats__batting__hits:
+        data_type: bigint
+        nullable: true
+      stats__batting__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      stats__batting__at_bats:
+        data_type: bigint
+        nullable: true
+      stats__batting__caught_stealing:
+        data_type: bigint
+        nullable: true
+      stats__batting__stolen_bases:
+        data_type: bigint
+        nullable: true
+      stats__batting__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      stats__batting__ground_into_double_play:
+        data_type: bigint
+        nullable: true
+      stats__batting__ground_into_triple_play:
+        data_type: bigint
+        nullable: true
+      stats__batting__plate_appearances:
+        data_type: bigint
+        nullable: true
+      stats__batting__total_bases:
+        data_type: bigint
+        nullable: true
+      stats__batting__rbi:
+        data_type: bigint
+        nullable: true
+      stats__batting__left_on_base:
+        data_type: bigint
+        nullable: true
+      stats__batting__sac_bunts:
+        data_type: bigint
+        nullable: true
+      stats__batting__sac_flies:
+        data_type: bigint
+        nullable: true
+      stats__batting__catchers_interference:
+        data_type: bigint
+        nullable: true
+      stats__batting__pickoffs:
+        data_type: bigint
+        nullable: true
+      stats__batting__at_bats_per_home_run:
+        data_type: text
+        nullable: true
+      stats__batting__pop_outs:
+        data_type: bigint
+        nullable: true
+      stats__batting__line_outs:
+        data_type: bigint
+        nullable: true
+      status__code:
+        data_type: text
+        nullable: true
+      status__description:
+        data_type: text
+        nullable: true
+      position__code:
+        data_type: text
+        nullable: true
+      position__name:
+        data_type: text
+        nullable: true
+      position__type:
+        data_type: text
+        nullable: true
+      position__abbreviation:
+        data_type: text
+        nullable: true
+      person__id:
+        data_type: bigint
+        nullable: true
+      person__full_name:
+        data_type: text
+        nullable: true
+      person__link:
+        data_type: text
+        nullable: true
+      person__boxscore_name:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+      season_stats__pitching__pitches_thrown:
+        data_type: bigint
+        nullable: true
+      stats__pitching__summary:
+        data_type: text
+        nullable: true
+      stats__pitching__games_played:
+        data_type: bigint
+        nullable: true
+      stats__pitching__games_started:
+        data_type: bigint
+        nullable: true
+      stats__pitching__fly_outs:
+        data_type: bigint
+        nullable: true
+      stats__pitching__ground_outs:
+        data_type: bigint
+        nullable: true
+      stats__pitching__air_outs:
+        data_type: bigint
+        nullable: true
+      stats__pitching__runs:
+        data_type: bigint
+        nullable: true
+      stats__pitching__doubles:
+        data_type: bigint
+        nullable: true
+      stats__pitching__triples:
+        data_type: bigint
+        nullable: true
+      stats__pitching__home_runs:
+        data_type: bigint
+        nullable: true
+      stats__pitching__strike_outs:
+        data_type: bigint
+        nullable: true
+      stats__pitching__base_on_balls:
+        data_type: bigint
+        nullable: true
+      stats__pitching__intentional_walks:
+        data_type: bigint
+        nullable: true
+      stats__pitching__hits:
+        data_type: bigint
+        nullable: true
+      stats__pitching__hit_by_pitch:
+        data_type: bigint
+        nullable: true
+      stats__pitching__at_bats:
+        data_type: bigint
+        nullable: true
+      stats__pitching__caught_stealing:
+        data_type: bigint
+        nullable: true
+      stats__pitching__stolen_bases:
+        data_type: bigint
+        nullable: true
+      stats__pitching__stolen_base_percentage:
+        data_type: text
+        nullable: true
+      stats__pitching__number_of_pitches:
+        data_type: bigint
+        nullable: true
+      stats__pitching__innings_pitched:
+        data_type: text
+        nullable: true
+      stats__pitching__wins:
+        data_type: bigint
+        nullable: true
+      stats__pitching__losses:
+        data_type: bigint
+        nullable: true
+      stats__pitching__saves:
+        data_type: bigint
+        nullable: true
+      stats__pitching__save_opportunities:
+        data_type: bigint
+        nullable: true
+      stats__pitching__holds:
+        data_type: bigint
+        nullable: true
+      stats__pitching__blown_saves:
+        data_type: bigint
+        nullable: true
+      stats__pitching__earned_runs:
+        data_type: bigint
+        nullable: true
+      stats__pitching__batters_faced:
+        data_type: bigint
+        nullable: true
+      stats__pitching__outs:
+        data_type: bigint
+        nullable: true
+      stats__pitching__games_pitched:
+        data_type: bigint
+        nullable: true
+      stats__pitching__complete_games:
+        data_type: bigint
+        nullable: true
+      stats__pitching__shutouts:
+        data_type: bigint
+        nullable: true
+      stats__pitching__pitches_thrown:
+        data_type: bigint
+        nullable: true
+      stats__pitching__balls:
+        data_type: bigint
+        nullable: true
+      stats__pitching__strikes:
+        data_type: bigint
+        nullable: true
+      stats__pitching__strike_percentage:
+        data_type: text
+        nullable: true
+      stats__pitching__hit_batsmen:
+        data_type: bigint
+        nullable: true
+      stats__pitching__balks:
+        data_type: bigint
+        nullable: true
+      stats__pitching__wild_pitches:
+        data_type: bigint
+        nullable: true
+      stats__pitching__pickoffs:
+        data_type: bigint
+        nullable: true
+      stats__pitching__rbi:
+        data_type: bigint
+        nullable: true
+      stats__pitching__games_finished:
+        data_type: bigint
+        nullable: true
+      stats__pitching__runs_scored_per9:
+        data_type: text
+        nullable: true
+      stats__pitching__home_runs_per9:
+        data_type: text
+        nullable: true
+      stats__pitching__inherited_runners:
+        data_type: bigint
+        nullable: true
+      stats__pitching__inherited_runners_scored:
+        data_type: bigint
+        nullable: true
+      stats__pitching__catchers_interference:
+        data_type: bigint
+        nullable: true
+      stats__pitching__sac_bunts:
+        data_type: bigint
+        nullable: true
+      stats__pitching__sac_flies:
+        data_type: bigint
+        nullable: true
+      stats__pitching__passed_ball:
+        data_type: bigint
+        nullable: true
+      stats__pitching__pop_outs:
+        data_type: bigint
+        nullable: true
+      stats__pitching__line_outs:
+        data_type: bigint
+        nullable: true
+      season_stats__fielding__games_started:
+        data_type: bigint
+        nullable: true
+      stats__fielding__games_started:
+        data_type: bigint
+        nullable: true
+      stats__pitching__note:
+        data_type: text
+        nullable: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__players__all_positions:
+    columns:
+      code:
+        data_type: text
+        nullable: true
+      name:
+        data_type: text
+        nullable: true
+      type:
+        data_type: text
+        nullable: true
+      abbreviation:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore__players
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__home__batters:
+    columns:
+      value:
+        data_type: bigint
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__home__pitchers:
+    columns:
+      value:
+        data_type: bigint
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__home__bench:
+    columns:
+      value:
+        data_type: bigint
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__home__bullpen:
+    columns:
+      value:
+        data_type: bigint
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__home__batting_order:
+    columns:
+      value:
+        data_type: bigint
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__home__info:
+    columns:
+      title:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__home__info__field_list:
+    columns:
+      label:
+        data_type: text
+        nullable: true
+      value:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore__teams__home__info
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__home__note:
+    columns:
+      label:
+        data_type: text
+        nullable: true
+      value:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__away__batters:
+    columns:
+      value:
+        data_type: bigint
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__away__pitchers:
+    columns:
+      value:
+        data_type: bigint
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__away__bench:
+    columns:
+      value:
+        data_type: bigint
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__away__bullpen:
+    columns:
+      value:
+        data_type: bigint
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__away__batting_order:
+    columns:
+      value:
+        data_type: bigint
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__away__info:
+    columns:
+      title:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__away__info__field_list:
+    columns:
+      label:
+        data_type: text
+        nullable: true
+      value:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore__teams__away__info
+    x-normalizer:
+      seen-data: true
+  boxscore__teams__away__note:
+    columns:
+      label:
+        data_type: text
+        nullable: true
+      value:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  boxscore__pitching_notes:
+    columns:
+      value:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_parent_id:
+        data_type: text
+        nullable: false
+        parent_key: true
+      _dlt_list_idx:
+        data_type: bigint
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    parent: boxscore
+    x-normalizer:
+      seen-data: true
+  standings:
+    columns: {}
+    write_disposition: append
+    file_format: parquet
+    resource: standings
+  rosters:
+    columns:
+      team_id:
+        data_type: bigint
+        nullable: true
+      roster_date:
+        data_type: text
+        nullable: true
+      jersey_number:
+        data_type: text
+        nullable: true
+      parent_team_id:
+        data_type: bigint
+        nullable: true
+      status__code:
+        data_type: text
+        nullable: true
+      status__description:
+        data_type: text
+        nullable: true
+      position__code:
+        data_type: text
+        nullable: true
+      position__name:
+        data_type: text
+        nullable: true
+      position__type:
+        data_type: text
+        nullable: true
+      position__abbreviation:
+        data_type: text
+        nullable: true
+      person__id:
+        data_type: bigint
+        nullable: true
+      person__full_name:
+        data_type: text
+        nullable: true
+      person__link:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+      note:
+        data_type: text
+        nullable: true
+    write_disposition: append
+    file_format: parquet
+    resource: rosters
+    x-normalizer:
+      seen-data: true
+  teams:
+    columns:
+      all_star_status:
+        data_type: text
+        nullable: true
+      id:
+        data_type: bigint
+        nullable: true
+      name:
+        data_type: text
+        nullable: true
+      link:
+        data_type: text
+        nullable: true
+      season:
+        data_type: bigint
+        nullable: true
+      team_code:
+        data_type: text
+        nullable: true
+      file_code:
+        data_type: text
+        nullable: true
+      abbreviation:
+        data_type: text
+        nullable: true
+      team_name:
+        data_type: text
+        nullable: true
+      location_name:
+        data_type: text
+        nullable: true
+      first_year_of_play:
+        data_type: text
+        nullable: true
+      short_name:
+        data_type: text
+        nullable: true
+      franchise_name:
+        data_type: text
+        nullable: true
+      club_name:
+        data_type: text
+        nullable: true
+      active:
+        data_type: bool
+        nullable: true
+      sport__id:
+        data_type: bigint
+        nullable: true
+      sport__link:
+        data_type: text
+        nullable: true
+      sport__name:
+        data_type: text
+        nullable: true
+      division__id:
+        data_type: bigint
+        nullable: true
+      division__name:
+        data_type: text
+        nullable: true
+      division__link:
+        data_type: text
+        nullable: true
+      league__id:
+        data_type: bigint
+        nullable: true
+      league__name:
+        data_type: text
+        nullable: true
+      league__link:
+        data_type: text
+        nullable: true
+      spring_venue__id:
+        data_type: bigint
+        nullable: true
+      spring_venue__link:
+        data_type: text
+        nullable: true
+      venue__id:
+        data_type: bigint
+        nullable: true
+      venue__name:
+        data_type: text
+        nullable: true
+      venue__link:
+        data_type: text
+        nullable: true
+      spring_league__id:
+        data_type: bigint
+        nullable: true
+      spring_league__name:
+        data_type: text
+        nullable: true
+      spring_league__link:
+        data_type: text
+        nullable: true
+      spring_league__abbreviation:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    write_disposition: append
+    file_format: parquet
+    resource: teams_2026
+    x-normalizer:
+      seen-data: true
+  people:
+    columns:
+      id:
+        data_type: bigint
+        nullable: true
+      full_name:
+        data_type: text
+        nullable: true
+      link:
+        data_type: text
+        nullable: true
+      first_name:
+        data_type: text
+        nullable: true
+      last_name:
+        data_type: text
+        nullable: true
+      primary_number:
+        data_type: text
+        nullable: true
+      birth_date:
+        data_type: text
+        nullable: true
+      current_age:
+        data_type: bigint
+        nullable: true
+      birth_city:
+        data_type: text
+        nullable: true
+      birth_state_province:
+        data_type: text
+        nullable: true
+      birth_country:
+        data_type: text
+        nullable: true
+      height:
+        data_type: text
+        nullable: true
+      weight:
+        data_type: bigint
+        nullable: true
+      active:
+        data_type: bool
+        nullable: true
+      use_name:
+        data_type: text
+        nullable: true
+      use_last_name:
+        data_type: text
+        nullable: true
+      middle_name:
+        data_type: text
+        nullable: true
+      boxscore_name:
+        data_type: text
+        nullable: true
+      nick_name:
+        data_type: text
+        nullable: true
+      gender:
+        data_type: text
+        nullable: true
+      is_player:
+        data_type: bool
+        nullable: true
+      is_verified:
+        data_type: bool
+        nullable: true
+      draft_year:
+        data_type: bigint
+        nullable: true
+      mlb_debut_date:
+        data_type: text
+        nullable: true
+      name_first_last:
+        data_type: text
+        nullable: true
+      name_slug:
+        data_type: text
+        nullable: true
+      first_last_name:
+        data_type: text
+        nullable: true
+      last_first_name:
+        data_type: text
+        nullable: true
+      last_init_name:
+        data_type: text
+        nullable: true
+      init_last_name:
+        data_type: text
+        nullable: true
+      full_fml_name:
+        data_type: text
+        nullable: true
+      full_lfm_name:
+        data_type: text
+        nullable: true
+      strike_zone_top:
+        data_type: double
+        nullable: true
+      strike_zone_bottom:
+        data_type: double
+        nullable: true
+      pitch_hand__code:
+        data_type: text
+        nullable: true
+      pitch_hand__description:
+        data_type: text
+        nullable: true
+      bat_side__code:
+        data_type: text
+        nullable: true
+      bat_side__description:
+        data_type: text
+        nullable: true
+      primary_position__code:
+        data_type: text
+        nullable: true
+      primary_position__name:
+        data_type: text
+        nullable: true
+      primary_position__type:
+        data_type: text
+        nullable: true
+      primary_position__abbreviation:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+      pronunciation:
+        data_type: text
+        nullable: true
+      name_matrilineal:
+        data_type: text
+        nullable: true
+      name_title:
+        data_type: text
+        nullable: true
+      name_suffix:
+        data_type: text
+        nullable: true
+      last_played_date:
+        data_type: text
+        nullable: true
+    write_disposition: append
+    file_format: parquet
+    resource: people
+    x-normalizer:
+      seen-data: true
+settings:
+  detections:
+  - iso_timestamp
+  default_hints:
+    not_null:
+    - _dlt_id
+    - _dlt_root_id
+    - _dlt_parent_id
+    - _dlt_list_idx
+    - _dlt_load_id
+    parent_key:
+    - _dlt_parent_id
+    root_key:
+    - _dlt_root_id
+    unique:
+    - _dlt_id
+    row_key:
+    - _dlt_id
+normalizers:
+  names: snake_case
+  json:
+    module: dlt.common.normalizers.json.relational
+    config:
+      propagation:
+        root:
+          _dlt_load_id: _dlt_load_id
+previous_hashes:
+- y9nN/4jpeFP0ex9zQ4QVnsjL5a+CZg820wHt8Yj1FRg=
+- SDPFK4G3HcOdeekoht2XlgRDesGcNs9bmhfY8OdtOfM=
+- +c8eMGZKlS7vWt0TiYD8B/Gt63EigFOHQve+L4WZ/y8=
+- 7voVmB8zHa9FncTQdatZsC8PXO79KISCaLxAL1YCXsI=
+- 0hLL1rIcFbbegek/LGQSY6DFBAIilTWpgSBlH44OoEc=
+- 0bgckndSR6HcQWNX51vny1ygVorSnfjQ2KPVvas5LfQ=
+- T66XgoBB2zo62FArIaLDwr+rrd25VP+4IKe5MiEr1lQ=
+- Hi+KfWTGjt8utmX3RwpYCaCtxXbqtpn7YSE5mG/RMTs=

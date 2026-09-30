@@ -1,0 +1,476 @@
+version: 2
+version_hash: 3uN40hftXYZ9Y75j6D884tlDRjjLpTWncQRe3muesNk=
+engine_version: 11
+name: statcast
+tables:
+  _dlt_version:
+    columns:
+      version:
+        data_type: bigint
+        nullable: false
+      engine_version:
+        data_type: bigint
+        nullable: false
+      inserted_at:
+        data_type: timestamp
+        nullable: false
+      schema_name:
+        data_type: text
+        nullable: false
+      version_hash:
+        data_type: text
+        nullable: false
+      schema:
+        data_type: text
+        nullable: false
+    write_disposition: skip
+    resource: _dlt_version
+    description: Created by DLT. Tracks schema updates
+  _dlt_loads:
+    columns:
+      load_id:
+        data_type: text
+        nullable: false
+        precision: 64
+      schema_name:
+        data_type: text
+        nullable: true
+      status:
+        data_type: bigint
+        nullable: false
+      inserted_at:
+        data_type: timestamp
+        nullable: false
+      schema_version_hash:
+        data_type: text
+        nullable: true
+    write_disposition: skip
+    resource: _dlt_loads
+    description: Created by DLT. Tracks completed loads
+  pitches:
+    columns:
+      pitch_type:
+        nullable: true
+        data_type: text
+      game_date:
+        nullable: true
+        data_type: text
+      release_speed:
+        nullable: true
+        data_type: double
+      release_pos_x:
+        nullable: true
+        data_type: double
+      release_pos_z:
+        nullable: true
+        data_type: double
+      player_name:
+        nullable: true
+        data_type: text
+      batter:
+        nullable: true
+        data_type: bigint
+      pitcher:
+        nullable: true
+        data_type: bigint
+      events:
+        nullable: true
+        data_type: text
+      description:
+        nullable: true
+        data_type: text
+      spin_dir:
+        nullable: true
+        data_type: bigint
+      spin_rate_deprecated:
+        nullable: true
+        data_type: bigint
+      break_angle_deprecated:
+        nullable: true
+        data_type: bigint
+      break_length_deprecated:
+        nullable: true
+        data_type: bigint
+      zone:
+        nullable: true
+        data_type: bigint
+      des:
+        nullable: true
+        data_type: text
+      game_type:
+        nullable: true
+        data_type: text
+      stand:
+        nullable: true
+        data_type: text
+      p_throws:
+        nullable: true
+        data_type: text
+      home_team:
+        nullable: true
+        data_type: text
+      away_team:
+        nullable: true
+        data_type: text
+      type:
+        nullable: true
+        data_type: text
+      hit_location:
+        nullable: true
+        data_type: bigint
+      bb_type:
+        nullable: true
+        data_type: text
+      balls:
+        nullable: true
+        data_type: bigint
+      strikes:
+        nullable: true
+        data_type: bigint
+      game_year:
+        nullable: true
+        data_type: bigint
+      pfx_x:
+        nullable: true
+        data_type: double
+      pfx_z:
+        nullable: true
+        data_type: double
+      plate_x:
+        nullable: true
+        data_type: double
+      plate_z:
+        nullable: true
+        data_type: double
+      on_3b:
+        nullable: true
+        data_type: bigint
+      on_2b:
+        nullable: true
+        data_type: bigint
+      on_1b:
+        nullable: true
+        data_type: bigint
+      outs_when_up:
+        nullable: true
+        data_type: bigint
+      inning:
+        nullable: true
+        data_type: bigint
+      inning_topbot:
+        nullable: true
+        data_type: text
+      hc_x:
+        nullable: true
+        data_type: double
+      hc_y:
+        nullable: true
+        data_type: double
+      tfs_deprecated:
+        nullable: true
+        data_type: bigint
+      tfs_zulu_deprecated:
+        nullable: true
+        data_type: bigint
+      umpire:
+        nullable: true
+        data_type: bigint
+      sv_id:
+        nullable: true
+        data_type: bigint
+      vx0:
+        nullable: true
+        data_type: double
+      vy0:
+        nullable: true
+        data_type: double
+      vz0:
+        nullable: true
+        data_type: double
+      ax:
+        nullable: true
+        data_type: double
+      ay:
+        nullable: true
+        data_type: double
+      az:
+        nullable: true
+        data_type: double
+      sz_top:
+        nullable: true
+        data_type: double
+      sz_bot:
+        nullable: true
+        data_type: double
+      hit_distance_sc:
+        nullable: true
+        data_type: bigint
+      launch_speed:
+        nullable: true
+        data_type: double
+      launch_angle:
+        nullable: true
+        data_type: bigint
+      effective_speed:
+        nullable: true
+        data_type: double
+      release_spin_rate:
+        nullable: true
+        data_type: bigint
+      release_extension:
+        nullable: true
+        data_type: double
+      game_pk:
+        nullable: true
+        data_type: bigint
+      fielder_2:
+        nullable: true
+        data_type: bigint
+      fielder_3:
+        nullable: true
+        data_type: bigint
+      fielder_4:
+        nullable: true
+        data_type: bigint
+      fielder_5:
+        nullable: true
+        data_type: bigint
+      fielder_6:
+        nullable: true
+        data_type: bigint
+      fielder_7:
+        nullable: true
+        data_type: bigint
+      fielder_8:
+        nullable: true
+        data_type: bigint
+      fielder_9:
+        nullable: true
+        data_type: bigint
+      release_pos_y:
+        nullable: true
+        data_type: double
+      estimated_ba_using_speedangle:
+        nullable: true
+        data_type: double
+      estimated_woba_using_speedangle:
+        nullable: true
+        data_type: double
+      woba_value:
+        nullable: true
+        data_type: double
+      woba_denom:
+        nullable: true
+        data_type: bigint
+      babip_value:
+        nullable: true
+        data_type: bigint
+      iso_value:
+        nullable: true
+        data_type: bigint
+      launch_speed_angle:
+        nullable: true
+        data_type: bigint
+      at_bat_number:
+        nullable: true
+        data_type: bigint
+      pitch_number:
+        nullable: true
+        data_type: bigint
+      pitch_name:
+        nullable: true
+        data_type: text
+      home_score:
+        nullable: true
+        data_type: bigint
+      away_score:
+        nullable: true
+        data_type: bigint
+      bat_score:
+        nullable: true
+        data_type: bigint
+      fld_score:
+        nullable: true
+        data_type: bigint
+      post_away_score:
+        nullable: true
+        data_type: bigint
+      post_home_score:
+        nullable: true
+        data_type: bigint
+      post_bat_score:
+        nullable: true
+        data_type: bigint
+      post_fld_score:
+        nullable: true
+        data_type: bigint
+      if_fielding_alignment:
+        nullable: true
+        data_type: text
+      of_fielding_alignment:
+        nullable: true
+        data_type: text
+      spin_axis:
+        nullable: true
+        data_type: bigint
+      delta_home_win_exp:
+        nullable: true
+        data_type: double
+      delta_run_exp:
+        nullable: true
+        data_type: double
+      bat_speed:
+        nullable: true
+        data_type: double
+      swing_length:
+        nullable: true
+        data_type: double
+      miss_distance:
+        nullable: true
+        data_type: double
+      estimated_slg_using_speedangle:
+        nullable: true
+        data_type: double
+      delta_pitcher_run_exp:
+        nullable: true
+        data_type: double
+      hyper_speed:
+        nullable: true
+        data_type: double
+      home_score_diff:
+        nullable: true
+        data_type: bigint
+      bat_score_diff:
+        nullable: true
+        data_type: bigint
+      home_win_exp:
+        nullable: true
+        data_type: double
+      bat_win_exp:
+        nullable: true
+        data_type: double
+      age_pit_legacy:
+        nullable: true
+        data_type: bigint
+      age_bat_legacy:
+        nullable: true
+        data_type: bigint
+      age_pit:
+        nullable: true
+        data_type: bigint
+      age_bat:
+        nullable: true
+        data_type: bigint
+      n_thruorder_pitcher:
+        nullable: true
+        data_type: bigint
+      n_priorpa_thisgame_player_at_bat:
+        nullable: true
+        data_type: bigint
+      pitcher_days_since_prev_game:
+        nullable: true
+        data_type: bigint
+      batter_days_since_prev_game:
+        nullable: true
+        data_type: bigint
+      pitcher_days_until_next_game:
+        nullable: true
+        data_type: bigint
+      batter_days_until_next_game:
+        nullable: true
+        data_type: bigint
+      api_break_z_with_gravity:
+        nullable: true
+        data_type: double
+      api_break_x_arm:
+        nullable: true
+        data_type: double
+      api_break_x_batter_in:
+        nullable: true
+        data_type: double
+      arm_angle:
+        nullable: true
+        data_type: double
+      attack_angle:
+        nullable: true
+        data_type: double
+      attack_direction:
+        nullable: true
+        data_type: double
+      swing_path_tilt:
+        nullable: true
+        data_type: double
+      intercept_ball_minus_batter_pos_x_inches:
+        nullable: true
+        data_type: double
+      intercept_ball_minus_batter_pos_y_inches:
+        nullable: true
+        data_type: double
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+        precision: 64
+    write_disposition: append
+    file_format: parquet
+    resource: pitches
+    x-normalizer:
+      seen-data: true
+  _dlt_pipeline_state:
+    columns:
+      version:
+        data_type: bigint
+        nullable: false
+      engine_version:
+        data_type: bigint
+        nullable: false
+      pipeline_name:
+        data_type: text
+        nullable: false
+      state:
+        data_type: text
+        nullable: false
+      created_at:
+        data_type: timestamp
+        nullable: false
+      version_hash:
+        data_type: text
+        nullable: true
+      _dlt_load_id:
+        data_type: text
+        nullable: false
+        precision: 64
+      _dlt_id:
+        data_type: text
+        nullable: false
+        unique: true
+        row_key: true
+    write_disposition: append
+    file_format: preferred
+    resource: _dlt_pipeline_state
+    x-normalizer:
+      seen-data: true
+settings:
+  detections:
+  - iso_timestamp
+  default_hints:
+    not_null:
+    - _dlt_id
+    - _dlt_root_id
+    - _dlt_parent_id
+    - _dlt_list_idx
+    - _dlt_load_id
+    parent_key:
+    - _dlt_parent_id
+    root_key:
+    - _dlt_root_id
+    unique:
+    - _dlt_id
+    row_key:
+    - _dlt_id
+normalizers:
+  names: snake_case
+  json:
+    module: dlt.common.normalizers.json.relational
+previous_hashes:
+- 9esQTpVfB7m6q/uoq5TSp79X1lZbWWGIrgcjSAqkA0Y=
+- ctrqs7iFD4whWf2fkwvH5GyUq6bQihC85aiufLmiLdk=
