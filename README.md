@@ -78,7 +78,7 @@ docker compose run --rm reports ci                          # once: install the 
 docker compose run --rm --service-ports reports run dev     # http://localhost:3000
 ```
 
-An [Evidence](https://github.com/evidence-dev/evidence) page of charts and tables over the staging layer, for a quick smell test of what landed. CI builds the same report for every PR and links it from the PR. See [`docs/usage.md`](./docs/usage.md#data-report).
+An [Evidence](https://github.com/evidence-dev/evidence) page of row and game counts over the staging layer, for a quick smell test of what landed. CI builds the same report for every PR and links it from the PR. See [`docs/usage.md`](./docs/usage.md#data-report).
 
 ---
 

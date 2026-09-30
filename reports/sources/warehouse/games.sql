@@ -1,6 +1,6 @@
 -- One row per scheduled game, with how many Statcast pitches and boxscore players landed for it.
 with pitches as (
-    select game_pk, count(*) as pitches, max(inning) as innings_with_pitches
+    select game_pk, count(*) as pitches
     from staging.stg_statcast__pitches
     group by game_pk
 ),
@@ -23,8 +23,6 @@ teams as (
 )
 
 select
-    -- text, so the page shows the id as-is instead of formatting it as a number
-    cast(g.game_pk as varchar) as game_pk,
     g.game_date,
     g.game_type,
     coalesce(away.abbreviation, g.away_team_name)
@@ -32,7 +30,6 @@ select
     g.detailed_state,
     g.coded_game_state,
     coalesce(p.pitches, 0) as pitches,
-    p.innings_with_pitches,
     coalesce(b.batters, 0) as batters,
     coalesce(pp.pitchers, 0) as pitchers
 from staging.stg_mlb__games as g

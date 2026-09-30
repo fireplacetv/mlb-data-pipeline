@@ -222,7 +222,7 @@ docker compose run --rm dbt docs serve  # In a separate terminal to see them loc
 
 ## Data Report
 
-`reports/` is an [Evidence](https://github.com/evidence-dev/evidence) project: one page of charts and tables over the staging layer, for smell-testing what landed. CI builds it for every PR (see "Continuous Integration"); you can also build it or run it live from your own warehouse. It runs in the `reports` service (a `node` image), not the Python image.
+`reports/` is an [Evidence](https://github.com/evidence-dev/evidence) project: one page of counts over the staging layer, for smell-testing what landed. CI builds it for every PR (see "Continuous Integration"); you can also build it or run it live from your own warehouse. It runs in the `reports` service (a `node` image), not the Python image.
 
 Install its packages once (and again after `reports/package-lock.json` changes). They go in `reports/node_modules/`:
 
@@ -245,13 +245,12 @@ docker compose run --rm --service-ports reports run dev
 **Before either:** build the warehouse with `dbt build`, and don't have dbt running at the same time. Both commands first run `evidence sources`, which opens `data/warehouse/mlb.duckdb` read-only and runs each query in `reports/sources/warehouse/` against it. To pick up new data, run the command again.
 
 **What's on the page**, top to bottom:
-- Totals, and alerts for empty models or final games with no Statcast pitches.
-- Each game with its pitch and boxscore counts, against the typical 250 to 350 pitches.
-- Pitch locations colored by result (ball, strike, in play) around a strike zone, velocity by pitch type, and pitch mix.
-- Exit velocity by launch angle, and a spray chart.
+- The dates loaded, and alerts for empty models or final games with no Statcast pitches.
 - Rows and dates per model.
-- Every column of every model with its type and null rate, most-null first, searchable.
-- Collapsed: the completed dlt loads and 100 sample pitches.
+- Each game with its pitch and boxscore counts (a typical game has 250 to 350 pitches).
+- Columns that are null in every row. CI loads the same day every time, so a new entry here usually means the source renamed or dropped a field.
+
+It shows counts only, no individual pitches or batted balls, which keeps the site small.
 
 **Changing it:** source queries (`reports/sources/warehouse/*.sql`) read `staging.*` in DuckDB SQL; each becomes a table `warehouse.<file name>` that the page's SQL blocks query. Both builds run in strict mode, so a failing query fails the build. The page uses the Svelte-style syntax of the open-source Evidence, for example `<BarChart data={games} x=matchup y=pitches />`; see its [component docs](https://docs.evidence.dev/components/all-components). (Evidence's newer hosted product uses a different syntax and isn't used here; see `ARCHITECTURE.md` §9.3.)
 
