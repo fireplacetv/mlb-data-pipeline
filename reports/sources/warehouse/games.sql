@@ -28,10 +28,16 @@ select
     g.game_type,
     coalesce(away.abbreviation, g.away_team_name)
         || ' @ ' || coalesce(home.abbreviation, g.home_team_name) as matchup,
-    coalesce(away.abbreviation, g.away_team_name) as away_team,
-    coalesce(home.abbreviation, g.home_team_name) as home_team,
-    g.away_score,
-    g.home_score,
+    -- Built here, where scores are still integers: Evidence stores source numbers as doubles,
+    -- so the page would print "3.0". Games that aren't final show their status instead.
+    case
+        when g.coded_game_state in ('F', 'O')
+            then coalesce(away.abbreviation, g.away_team_name) || ' ' || g.away_score
+                || ' @ ' || coalesce(home.abbreviation, g.home_team_name) || ' ' || g.home_score
+        else coalesce(away.abbreviation, g.away_team_name)
+            || ' @ ' || coalesce(home.abbreviation, g.home_team_name)
+            || ' (' || g.detailed_state || ')'
+    end as game,
     g.detailed_state,
     g.coded_game_state,
     coalesce(p.pitches, 0) as pitches,

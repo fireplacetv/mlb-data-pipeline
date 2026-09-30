@@ -2,10 +2,6 @@
 title: Staging data smell test
 ---
 
-What landed in the dbt staging layer. CI builds this page from the day it ingests; locally it
-shows whatever is in `data/warehouse/mlb.duckdb`. The dbt tests are the pass/fail gate; this
-page is for eyeballing volume, with the day's scores and standings for context.
-
 <script>
     // Set by CI when it builds the report; a local build has neither.
     const builtAt = import.meta.env.VITE_REPORT_BUILT_AT;
@@ -18,6 +14,10 @@ page is for eyeballing volume, with the day's scores and standings for context.
 {:else}
 <small>Local build: no build time or commit recorded.</small>
 {/if}
+
+What landed in the dbt staging layer. CI builds this page from the day it ingests; locally it
+shows whatever is in `data/warehouse/mlb.duckdb`. The dbt tests are the pass/fail gate; this
+page is for eyeballing volume, with the day's scores and standings for context.
 
 ```sql window
 select
@@ -69,11 +69,7 @@ roughly 250 to 350 pitches, at least 9 batters and 2 pitchers per team, so about
 
 ```sql games
 select
-    case
-        when coded_game_state in ('F', 'O')
-            then away_team || ' ' || away_score || ' @ ' || home_team || ' ' || home_score
-        else matchup || ' (' || detailed_state || ')'
-    end as game,
+    game,
     pitches,
     batters,
     pitchers
