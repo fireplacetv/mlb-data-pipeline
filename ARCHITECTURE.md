@@ -1,6 +1,9 @@
 # MLB Data Pipeline — Architecture & Build Spec
+## Phase 0: Data Pipeline (Shipped)
 
-> **How to use this document:** This file is the source of truth for building the pipeline with Claude Code. Put it at the repo root and reference it from `CLAUDE.md`. Build one milestone at a time (§10), in order. Each milestone has acceptance checks that must pass before moving on. When this doc and a library's current docs disagree on API details, follow the library docs and update this file.
+> **How to use this document:** This file is the source of truth for Phase 0 (the data pipeline). It describes the shipped architecture: dlt extract/load to a local lake, dbt staging layer, and Docker setup. Build one milestone at a time (§10), in order. Each milestone has acceptance checks that must pass before moving on. When this doc and a library's current docs disagree on API details, follow the library docs and update this file.
+>
+> **Roadmap:** Phase 0 is complete. Phase 1 (modeling layer) and Phase 2 (cloud and scale) are documented in `docs/roadmap/`. Phase 2 is currently in progress. See `docs/roadmap/README.md` for status.
 
 ---
 
@@ -644,16 +647,27 @@ Every milestone updates `docs/` for anything it adds or changes (commands, flags
 
 ---
 
-## 12. Future (not in this plan)
+## 12. Future phases
 
-These items are grouped into development phases, each with a design doc in `docs/roadmap/` (§9.1). Details live there, not here.
+These items are grouped into development phases, each with a design doc in `docs/roadmap/` (§9.1). See `docs/roadmap/README.md` for current status.
 
-- **Delta Lake table format** in dlt (`table_format="delta"`) for true merges in the lake.
-- **Cloud lake:** change `bucket_url` to `s3://` / `gs://` / R2.
-- **Modeling layer:** intermediate models, facts and dimensions, rolling metrics.
-- **Additional sources:** FanGraphs, Baseball Reference, the Chadwick register.
-- **Scheduling and orchestration:** cron for a daily run, then Dagster if that stops being enough.
-- **More tooling, when the project grows:** SQL linting (sqlfluff) once the modeling layer adds real SQL volume, and pre-commit hooks once there's more than one contributor.
+**Phase 2 — Cloud and Scale** (in progress):
+- **Cloud lake:** dlt destination to Cloudflare R2 for production (local filesystem preserved for CI).
+- **Scheduled runs:** GitHub Actions for daily automated ingests.
+- **Secrets management:** GitHub Actions Secrets for R2 credentials.
+- **Milestones:** P2M1 (dlt → R2 + local flexibility), P2M2 (GitHub Actions scheduled daily runs), P2M3 (Delta Lake, deferred).
+
+**Phase 1 — Modeling Layer** (on hold, independent of Phase 2):
+- **Intermediate models:** events, games with derived status, seasons with aggregated stats.
+- **Facts and dimensions:** player, team, pitch outcome definitions.
+- **Calculated metrics:** batting average, OPS, wOBA, ERA, strikeout rate, WHIP.
+- **Rolling metrics:** trailing 7-day, season-to-date, career.
+- **Additional sources:** FanGraphs season stats, Baseball Reference, Chadwick Bureau player ID register.
+- **Snapshot and SCD2:** dimensional changes (e.g., player's team mid-season).
+
+**Future (beyond Phase 1 and Phase 2):**
+- **Multi-user access:** shared cloud warehouse (Postgres, Snowflake, or DuckDB Cloud).
+- **More tooling:** SQL linting (sqlfluff), pre-commit hooks, data governance / lineage.
 
 Not a phase, just kept in mind: **another warehouse (such as Postgres)**, via the guidelines in §8.
 

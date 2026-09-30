@@ -5,8 +5,8 @@ This index shows the development phases: current status, one-line goal, and a li
 | Phase | Goal | Status | Design Doc |
 |---|---|---|---|
 | **Phase 0** | Data pipeline scaffold, dlt extract/load, dbt staging layer, Docker setup | **Shipped** | [`ARCHITECTURE.md`](../../ARCHITECTURE.md) |
-| **Phase 1** | Modeling layer: intermediate models, facts, dimensions, rolling metrics; additional sources (FanGraphs, Baseball Reference, Chadwick) | Proposed | [`phase-1-modeling-layer.md`](./phase-1-modeling-layer.md) |
-| **Phase 2** | Cloud and scale: scheduling and orchestration (Dagster), cloud lake (S3/GCS), Delta Lake table format | Proposed | [`phase-2-cloud-and-scale.md`](./phase-2-cloud-and-scale.md) |
+| **Phase 1** | Modeling layer: intermediate models, facts, dimensions, rolling metrics; additional sources (FanGraphs, Baseball Reference, Chadwick) | **On hold** (independent of Phase 2; will resume after Phase 2 ships) | [`phase-1-modeling-layer.md`](./phase-1-modeling-layer.md) |
+| **Phase 2** | Cloud and scale: R2 cloud lake, GitHub Actions scheduling, secrets management | **In progress** | [`phase-2-cloud-and-scale.md`](./phase-2-cloud-and-scale.md) |
 
 ## How to Propose a New Phase
 
