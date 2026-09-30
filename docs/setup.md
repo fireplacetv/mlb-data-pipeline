@@ -33,6 +33,7 @@ The defaults in `.env.example` work for most users. Open `.env` and review:
 - **`GIANTS_TEAM_ID`:** Not yet used; kept for reference.
 - **`LOG_LEVEL`:** Set to `INFO` for normal runs, `DEBUG` for troubleshooting.
 - **`UID` and `GID` (Linux only):** See the note in `.env.example`. On macOS, leave as-is.
+- **`BUCKET_URL`, `IS_PROD`, `AWS_*`, `R2_ACCOUNT_ID`:** Leave empty / `false` to keep the lake local. Only production runs write to the cloud lake (see [Optional: cloud lake on Cloudflare R2](#optional-cloud-lake-on-cloudflare-r2)).
 
 See [`docs/configuration.md`](./configuration.md) for detailed explanations of every variable.
 
@@ -162,6 +163,39 @@ docker compose run --rm dbt build  # This will fail (no lake) but is okay; see "
 ```
 
 Then re-run the ingest commands.
+
+---
+
+## Optional: cloud lake on Cloudflare R2
+
+Development and CI use the local lake. Production writes the lake to [Cloudflare R2](https://developers.cloudflare.com/r2/), an S3-compatible object store, so it outlives any one machine. You only need this if you run the production pipeline.
+
+1. **Create a bucket.** In the Cloudflare dashboard, go to R2 → Create bucket (for example `mlb-lake`). Note your **account ID**, shown on the R2 overview page.
+2. **Create an API token.** R2 → Manage R2 API Tokens → Create API token, with **Object Read & Write** permission, scoped to that bucket. Copy the **Access Key ID** and **Secret Access Key** (the secret is shown once).
+3. **Point the pipeline at it.** In your `.env` (never in `.env.example`):
+
+   ```bash
+   BUCKET_URL=s3://mlb-lake/prod
+   IS_PROD=true
+   AWS_ACCESS_KEY_ID=<access key id>
+   AWS_SECRET_ACCESS_KEY=<secret access key>
+   R2_ACCOUNT_ID=<account id>
+   ```
+
+4. **Run an ingest and check the destination.** The first log line of the run names it:
+
+   ```bash
+   docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2025-09-01 --end 2025-09-01
+   # ... Lake destination: remote S3-compatible bucket s3://mlb-lake/prod (endpoint https://<account id>.r2.cloudflarestorage.com)
+   ```
+
+   The bucket then holds `prod/raw_statcast/pitches/*.parquet`, `prod/raw_statcast/_dlt_loads/`, and `prod/raw_statcast/_dlt_pipeline_state/`, the same layout as `data/lake/`.
+
+5. **Switch back** by emptying `BUCKET_URL` and setting `IS_PROD=false`. The two settings must agree, or the pipeline refuses to run (see [`docs/configuration.md`](./configuration.md#environment-variable-details)).
+
+**GitHub Actions Secrets** (for the scheduled run, coming in P2M2): in the repository's Settings → Secrets and variables → Actions, add `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` with the token's keys. The workflow maps them to `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`.
+
+The local lake and the R2 lake are separate: each has its own data and its own watermark.
 
 ---
 

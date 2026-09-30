@@ -12,6 +12,13 @@ x-mlb-base: &mlb-base
     DBT_PROJECT_DIR: /app/dbt
     TZ: America/Los_Angeles
     USER: ${USER:-dev}
+    # Lake destination (docs/configuration.md). Listed here, not only read from .env, so a
+    # value exported in the shell (GitHub Actions secrets) reaches the container too.
+    BUCKET_URL: ${BUCKET_URL:-}
+    IS_PROD: ${IS_PROD:-false}
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
   volumes:
     - .:/app
     - ./data:/data

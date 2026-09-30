@@ -52,14 +52,14 @@ docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2024-0
 - Each run is **one dlt load**: running the same range twice appends a second copy of the rows with a new `_dlt_load_id`. Staging deduplicates (latest load wins).
 - Backfills (`--start`/`--end`) turn on the pybaseball cache in `data/cache/pybaseball/`, so re-running a failed backfill doesn't re-download the days that already succeeded. Catch-up runs never use the cache, so they always see Savant's latest revisions. Cached days don't expire for a year: if you re-backfill a recent range to pick up revisions, clear the cache first (see "Resetting").
 
-**Output:**
+**Output** (paths shown for the default local lake; with `BUCKET_URL` set, the same layout lands under that URL instead, see [`docs/configuration.md`](./configuration.md)):
 - Parquet files in `data/lake/raw_statcast/pitches/`, named `<load_id>.<file_id>.parquet`. Every row carries `_dlt_load_id`.
 - One completed-load marker per load: `data/lake/raw_statcast/_dlt_loads/statcast__<load_id>.jsonl`. A load id without a marker didn't finish, and staging ignores its rows.
 - dlt's own tables next to them: `_dlt_pipeline_state/` (the synced watermark) and `_dlt_version/` (schema versions).
 - The dlt schema in `schemas/export/statcast.schema.yaml`. Commit it: a new, removed, or retyped column shows up as a git diff.
-- Logs to stdout and `data/logs/statcast_<timestamp>.log`: the watermark, the window, rows per day, schema changes (new tables, new columns, variant columns), rows loaded per table, duration per dlt step, and the new watermark.
+- Logs to stdout and `data/logs/statcast_<timestamp>.log`: the lake destination, the watermark, the window, rows per day, schema changes (new tables, new columns, variant columns), rows loaded per table, duration per dlt step, and the new watermark.
 
-**Exit codes:** `0` success; `1` one or more days failed (the rest loaded); `2` refused to run (catch-up gap over `MAX_CATCHUP_DAYS`, or invalid flags).
+**Exit codes:** `0` success; `1` one or more days failed (the rest loaded); `2` refused to run (catch-up gap over `MAX_CATCHUP_DAYS`, invalid flags, or a lake setting that doesn't add up: see `BUCKET_URL` in [`docs/configuration.md`](./configuration.md)).
 
 **Duration:** A few seconds for two days, minutes to hours for a season, depending on network and Savant responsiveness.
 
@@ -104,7 +104,7 @@ So a two-day backfill makes four loads (four marker files). Re-running a range a
   dlt also writes smaller child tables for the other lists in a response, for example `boxscore__teams__away__batters`, `boxscore__officials`, and `standings__team_records__records__split_records`. Child tables link to their parent row through `_dlt_parent_id`. Every table, child tables included, carries `_dlt_load_id`.
 - One completed-load marker per load: `data/lake/raw_mlb/_dlt_loads/mlb_api__<load_id>.jsonl`.
 - The dlt schema in `schemas/export/mlb_api.schema.yaml`. Commit it.
-- Logs to stdout and `data/logs/mlb_api_<timestamp>.log`: the watermark and window, rows per table and duration of each dlt step for every load, schema changes, total rows per table, the number of new player IDs, and the new watermark.
+- Logs to stdout and `data/logs/mlb_api_<timestamp>.log`: the lake destination, the watermark and window, rows per table and duration of each dlt step for every load, schema changes, total rows per table, the number of new player IDs, and the new watermark.
 
 **Exit codes:** the same as Statcast: `0` success; `1` one or more days failed (the rest loaded), or the snapshot or `people` step failed; `2` refused to run.
 

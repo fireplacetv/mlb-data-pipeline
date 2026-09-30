@@ -34,19 +34,21 @@ Requires Phase 0 (pipeline and staging) to be complete. Phase 1 (modeling layer)
 
 ### Changes to pipelines
 
-- **dlt destination config:** move from hardcoded `filesystem` with local paths to environment-driven config.
-  - `BUCKET_URL` env var controls destination: `file://data/lake` for local (CI), `s3://bucket/path` format pointing to R2 for prod.
-  - dlt's S3-compatible destination config (R2 uses S3 API) requires `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` env vars.
-  - `.dlt/config.toml` includes a new `[destination.filesystem_or_s3]` section (conditional on `BUCKET_URL`), and a `[destination.s3]` section for R2 credentials.
-  - Pipelines read `BUCKET_URL` from env at runtime; code changes only in `config.py` to pass it to dlt.
+- **dlt destination config:** move from hardcoded `filesystem` with local paths to environment-driven config (built in P2M1).
+  - `BUCKET_URL` env var controls destination: empty (the default) for the local lake at `<MLB_DATA_DIR>/lake` (dev, CI), `file://<path>` for another local folder, `s3://bucket/path` pointing to R2 for prod. Other schemes are refused.
+  - dlt's S3-compatible destination config (R2 uses S3 API) takes `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` env vars, plus `R2_ACCOUNT_ID` for the endpoint `https://<account id>.r2.cloudflarestorage.com` (region `auto`).
+  - `IS_PROD` gates it both ways: an `s3://` lake needs `IS_PROD=true`, and `IS_PROD=true` with a local lake is refused. Either mismatch, or missing keys, exits `2` with a message naming the setting.
+  - `config.py` reads all of these (`resolve_lake`) and `pipelines/common.py` builds the dlt destination and credentials in code, the same way `bucket_url` was already set in code. `.dlt/config.toml` doesn't change: no new sections are needed.
+  - `dlt[parquet]` becomes `dlt[parquet,s3]` (adds `s3fs`).
+  - Every run logs its destination first (`Lake destination: ...`), never the credentials.
 
 ### Changes to dbt models
 
-- None. dbt continues to read from `BUCKET_URL/raw_*` via `external_location` in sources, which already uses `MLB_DATA_DIR` env var. On R2, the mount point is a read-only DuckDB S3 mount.
+- None in P2M1. Correction found while building P2M1: the sources don't read `BUCKET_URL`. Their `external_location` is `<MLB_DATA_DIR>/lake/...`, and `stg_dlt__completed_loads` globs `<MLB_DATA_DIR>/lake/*/_dlt_loads/*`, so today dbt only sees the local lake. P2M2 has to bridge that for the prod run: either copy the R2 lake to the runner's `<MLB_DATA_DIR>/lake` before `dbt build` (no dbt change), or point the sources at `s3://` through DuckDB's `httpfs` with R2 credentials (a dbt change; check that `glob()` over the marker files works on S3). See Open Questions.
 
 ### Changes to Docker / environment
 
-- `docker-compose.yml`: add env vars `BUCKET_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (read from `.env` or GitHub Actions Secrets when running in CI).
+- `docker-compose.yml`: add env vars `BUCKET_URL`, `IS_PROD`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `R2_ACCOUNT_ID` as `${VAR:-}` interpolations, so they come from the shell (GitHub Actions Secrets) or `.env` (built in P2M1).
 - `.env.example`: document new vars and their defaults (local paths).
 - CI workflow (`.github/workflows/scheduled-ingest.yml`): new job, runs daily at 2 AM UTC (after games end, before US morning).
   - Sets `BUCKET_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` from GitHub Actions Secrets.
@@ -58,14 +60,14 @@ Requires Phase 0 (pipeline and staging) to be complete. Phase 1 (modeling layer)
 
 - `.env.example` additions:
   ```
-  BUCKET_URL=file://./data/lake
+  BUCKET_URL=
+  IS_PROD=false
   AWS_ACCESS_KEY_ID=
   AWS_SECRET_ACCESS_KEY=
   R2_ACCOUNT_ID=
-  R2_BUCKET_NAME=
-  IS_PROD=false
   ```
-- `.dlt/config.toml`: add S3-compatible destination section for R2 (or keep simple and let env vars drive it in code).
+  `BUCKET_URL` defaults to empty, not `file://./data/lake`: dlt reads `file://./data/lake` as the absolute path `/data/lake` (the `.` is taken as a host), which only matches the container's `MLB_DATA_DIR` by coincidence. Empty keeps the lake tied to `MLB_DATA_DIR`, where dbt reads it; `file://` paths are resolved against the working directory by `config.py`. `R2_BUCKET_NAME` is dropped: the bucket is already in `BUCKET_URL`.
+- `.dlt/config.toml`: no change; env vars drive the destination in code.
 - GitHub Actions Secrets (in repo settings):
   - `R2_ACCESS_KEY_ID`
   - `R2_SECRET_ACCESS_KEY`
@@ -95,7 +97,7 @@ Update §9 (Environment) to include the scheduled-ingest workflow and GitHub Act
 **Goal:** dlt pipelines work with both local filesystem (CI) and R2 (prod) via environment variables. No code changes needed to swap.
 
 **Acceptance checks:**
-- `BUCKET_URL=file://./data/lake` allows local ingest to work (existing behavior).
+- An empty `BUCKET_URL` (the default), or `BUCKET_URL=file://./data/lake`, allows local ingest to work (existing behavior).
 - `BUCKET_URL=s3://r2-bucket-url` with `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` set allows ingest to R2 (verified with test credentials or dry-run).
 - `docker compose run --rm pipeline python -m mlb.pipelines.statcast` runs against local lake (existing CI behavior).
 - `docker compose run --rm pipeline python -m mlb.pipelines.statcast` (with R2 env vars) runs against R2 (manual test or CI secret test).
@@ -136,12 +138,14 @@ Revisit only if the project moves to multiple concurrent writers, needs lake-lev
 - What time should the daily scheduled run happen? (Currently 2 AM UTC; adjust based on game schedule and user timezone preference.)
 - Should off-season runs skip or continue? (Tentatively: continue; MVP loads yesterday's games if any, or 0 rows.)
 - Failure notification: silent, GitHub Issues, Slack, email? (Tentatively: GitHub workflow shows red; logs in artifacts; optional Slack for team.)
+- P2M2: how does the prod `dbt build` read the R2 lake? Copy the lake to the runner first (simple, no dbt change, downloads the whole lake each run) or read `s3://` through DuckDB `httpfs` (reads only what it needs, but changes the sources and `stg_dlt__completed_loads`)?
 - R2 cost: acceptable for personal project? (Tentatively: yes; ~$5/month for storage at typical ingestion rate.)
 
 ## Status / Decision Log
 
 - **2026-09-27:** Phase marked as `proposed` with stub design.
 - **2026-09-30:** Phase `accepted` and `in progress`. Decisions finalized: R2 + local, GitHub Actions, GitHub Actions Secrets. Milestones P2M1 and P2M2 defined. P2M3 (Delta Lake) deferred. Phase 1 (modeling) marked independent and on hold.
+- **2026-09-30:** P2M1 built. `BUCKET_URL` / `IS_PROD` / `AWS_*` / `R2_ACCOUNT_ID` choose the lake in `config.py`; no code change swaps local and R2. Decisions: empty `BUCKET_URL` is the local default (not `file://./data/lake`, which dlt misreads), `IS_PROD` is enforced in both directions, `R2_BUCKET_NAME` dropped, dbt reading the R2 lake moved to P2M2. Verified with unit tests (no network) and an end-to-end Statcast run against a local S3 emulator (moto), configured only through env vars: Parquet, load markers and state landed in the bucket, and the watermark was restored from the bucket after deleting `dlt_pipelines/`. A run against a real R2 bucket is still to do once the bucket and token exist.
 
 ## References
 

@@ -3,7 +3,7 @@
 import logging
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -15,6 +15,14 @@ LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "4"))
 MAX_CATCHUP_DAYS = int(os.getenv("MAX_CATCHUP_DAYS", "30"))
 GIANTS_TEAM_ID = int(os.getenv("GIANTS_TEAM_ID", "137"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+# Lake destination (docs/roadmap/phase-2-cloud-and-scale.md, P2M1). An empty BUCKET_URL
+# means the local lake under MLB_DATA_DIR; an s3:// URL (Cloudflare R2) needs IS_PROD=true.
+BUCKET_URL = os.getenv("BUCKET_URL", "").strip()
+IS_PROD = os.getenv("IS_PROD", "false").strip().lower() in {"1", "true", "yes"}
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
+R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "").strip()
 
 # Data subdirectories
 LAKE_DIR = MLB_DATA_DIR / "lake"
@@ -65,6 +73,113 @@ def log_config() -> None:
     logger.info(f"LOOKBACK_DAYS: {LOOKBACK_DAYS}")
     logger.info(f"MAX_CATCHUP_DAYS: {MAX_CATCHUP_DAYS}")
     logger.info(f"GIANTS_TEAM_ID: {GIANTS_TEAM_ID}")
+    logger.info(f"IS_PROD: {IS_PROD}")
+
+
+# --- Lake destination (docs/roadmap/phase-2-cloud-and-scale.md, P2M1) --------
+
+
+class LakeConfigError(ValueError):
+    """BUCKET_URL, IS_PROD, and the credentials don't describe a usable lake."""
+
+
+@dataclass(frozen=True)
+class Lake:
+    """Where dlt writes the lake: a local folder, or an S3-compatible bucket (R2)."""
+
+    bucket_url: str
+    remote: bool
+    endpoint_url: str | None = None
+    access_key_id: str = field(default="", repr=False)
+    secret_access_key: str = field(default="", repr=False)
+
+    def describe(self) -> str:
+        """A log line naming the destination, without credentials."""
+        if not self.remote:
+            return f"local filesystem {self.bucket_url}"
+        endpoint = self.endpoint_url or "default AWS S3 endpoint"
+        return f"remote S3-compatible bucket {self.bucket_url} (endpoint {endpoint})"
+
+
+def r2_endpoint_url(account_id: str) -> str:
+    """The S3 API endpoint of a Cloudflare R2 account."""
+    return f"https://{account_id}.r2.cloudflarestorage.com"
+
+
+def resolve_lake(
+    data_dir: Path,
+    bucket_url: str,
+    is_prod: bool,
+    access_key_id: str = "",
+    secret_access_key: str = "",
+    r2_account_id: str = "",
+) -> Lake:
+    """Turn the lake settings into a Lake, failing loudly on a risky or incomplete setup.
+
+    An empty bucket_url is the local lake, data_dir/lake. A file:// URL is a local folder,
+    relative to the working directory. An s3:// URL is remote and needs is_prod (so a dev
+    run never writes the production lake by accident) and both credentials; r2_account_id
+    points it at R2. is_prod with a local lake is refused too, so a prod run with a missing
+    BUCKET_URL can't quietly write to a throwaway disk.
+    """
+    if not bucket_url:
+        lake = Lake(str(data_dir / "lake"), remote=False)
+    elif bucket_url.startswith("file://"):
+        # dlt reads file://./x as /x, so resolve relative paths here.
+        lake = Lake(str(Path(bucket_url.removeprefix("file://")).resolve()), remote=False)
+    elif bucket_url.startswith("s3://"):
+        lake = _remote_lake(bucket_url, is_prod, access_key_id, secret_access_key, r2_account_id)
+    else:
+        raise LakeConfigError(
+            f"BUCKET_URL={bucket_url!r} is not supported: leave it empty for the local lake, "
+            "or use file://<path> or s3://<bucket>/<path> (R2)"
+        )
+    if is_prod and not lake.remote:
+        raise LakeConfigError(
+            "IS_PROD=true needs a remote BUCKET_URL (s3://<bucket>/<path>); "
+            f"refusing to write the production lake to {lake.bucket_url}"
+        )
+    return lake
+
+
+def _remote_lake(
+    bucket_url: str, is_prod: bool, access_key_id: str, secret_access_key: str, account_id: str
+) -> Lake:
+    """Validate the settings for an s3:// lake and return it."""
+    if not is_prod:
+        raise LakeConfigError(
+            f"BUCKET_URL={bucket_url} is remote, but IS_PROD is not true. Set IS_PROD=true "
+            "to write the production lake, or leave BUCKET_URL empty for the local lake."
+        )
+    missing = [
+        name
+        for name, value in [
+            ("AWS_ACCESS_KEY_ID", access_key_id),
+            ("AWS_SECRET_ACCESS_KEY", secret_access_key),
+        ]
+        if not value
+    ]
+    if missing:
+        raise LakeConfigError(f"BUCKET_URL={bucket_url} needs {' and '.join(missing)}")
+    return Lake(
+        bucket_url.rstrip("/"),
+        remote=True,
+        endpoint_url=r2_endpoint_url(account_id) if account_id else None,
+        access_key_id=access_key_id,
+        secret_access_key=secret_access_key,
+    )
+
+
+def lake_from_env(data_dir: Path) -> Lake:
+    """The Lake described by BUCKET_URL, IS_PROD, and the credential env vars."""
+    return resolve_lake(
+        data_dir,
+        BUCKET_URL,
+        IS_PROD,
+        AWS_ACCESS_KEY_ID,
+        AWS_SECRET_ACCESS_KEY,
+        R2_ACCOUNT_ID,
+    )
 
 
 def yesterday(today: date | None = None) -> date:

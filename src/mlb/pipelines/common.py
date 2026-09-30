@@ -5,19 +5,46 @@ from datetime import date
 from pathlib import Path
 
 import dlt
+from dlt.common.configuration.specs import AwsCredentials
+
+from mlb import config
 
 logger = logging.getLogger(__name__)
 
 WATERMARK_KEY = "loaded_through"
 
 
+def lake_destination(lake: config.Lake) -> dlt.destinations.filesystem:
+    """A dlt filesystem destination for the lake: a local folder, or S3/R2 with credentials."""
+    if not lake.remote:
+        return dlt.destinations.filesystem(bucket_url=lake.bucket_url)
+    credentials = AwsCredentials(
+        aws_access_key_id=lake.access_key_id,
+        aws_secret_access_key=lake.secret_access_key,
+        endpoint_url=lake.endpoint_url,
+        # R2 ignores the region but S3 clients need one; "auto" is what R2 documents.
+        region_name="auto" if lake.endpoint_url else None,
+    )
+    return dlt.destinations.filesystem(bucket_url=lake.bucket_url, credentials=credentials)
+
+
 def build_pipeline(
-    pipeline_name: str, dataset_name: str, data_dir: Path, schema_dir: Path
+    pipeline_name: str,
+    dataset_name: str,
+    data_dir: Path,
+    schema_dir: Path,
+    lake: config.Lake | None = None,
 ) -> dlt.Pipeline:
-    """Create a dlt pipeline writing Parquet under data_dir/lake (§6.2)."""
+    """Create a dlt pipeline writing Parquet to the lake (§6.2).
+
+    The lake defaults to the one BUCKET_URL / IS_PROD describe (data_dir/lake when
+    BUCKET_URL is empty). Raises config.LakeConfigError for an unusable setup.
+    """
+    lake = lake or config.lake_from_env(data_dir)
+    logger.info("Lake destination: %s", lake.describe())
     return dlt.pipeline(
         pipeline_name=pipeline_name,
-        destination=dlt.destinations.filesystem(bucket_url=str(data_dir / "lake")),
+        destination=lake_destination(lake),
         dataset_name=dataset_name,
         pipelines_dir=str(data_dir / "dlt_pipelines"),
         export_schema_path=str(schema_dir),
