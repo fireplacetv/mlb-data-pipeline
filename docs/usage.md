@@ -245,6 +245,7 @@ docker compose run --rm --service-ports reports run dev
 **Before either:** build the warehouse with `dbt build`, and don't have dbt running at the same time. Both commands first run `evidence sources`, which opens `data/warehouse/mlb.duckdb` read-only and runs each query in `reports/sources/warehouse/` against it. To pick up new data, run the command again.
 
 **What's on the page**, top to bottom:
+- When it was built and from which commit (a PR's head commit), linked to GitHub. CI passes these in as `VITE_REPORT_BUILT_AT`, `VITE_REPORT_GIT_SHA` and `VITE_REPORT_COMMIT_URL`; a local build says it has neither.
 - The dates loaded, and alerts for empty models or final games with no Statcast pitches.
 - Scores: each game's final score (or its status, if not final), with its pitch and boxscore counts (a typical game has 250 to 350 pitches).
 - Standings by division as of the last date loaded: wins, losses, winning percentage, games back and streak.
