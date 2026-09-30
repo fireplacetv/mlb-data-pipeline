@@ -17,6 +17,10 @@ env:
   # day, set the CI_INGEST_DATE repository variable (YYYY-MM-DD); unset, CI uses 2025-09-01.
   INGEST_START: ${{ vars.CI_INGEST_DATE || '2025-09-01' }}
   INGEST_END: ${{ vars.CI_INGEST_DATE || '2025-09-01' }}
+  # Use production dbt schema naming in CI (clean schema names without developer prefix).
+  # Local dev uses dev mode with dbt_<username>_<schema> to isolate developer work.
+  # Future production workflows will also use production mode for a shared warehouse.
+  DBT_OUTPUT_MODE: production
 
 jobs:
   pipeline:
@@ -61,10 +65,10 @@ jobs:
       # failing test doesn't stop other models from building.
       - name: dbt run
         id: dbt_run
-        run: docker compose run --rm dbt run
+        run: docker compose run --rm -e DBT_OUTPUT_MODE=production dbt run
 
       - name: dbt test
-        run: docker compose run --rm dbt test
+        run: docker compose run --rm -e DBT_OUTPUT_MODE=production dbt test
 
       # The Evidence report (reports/) over the day just built, for a human smell test. Built
       # even when dbt test fails, since that's when a look at the data helps most. The base

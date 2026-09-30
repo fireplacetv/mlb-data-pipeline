@@ -13,6 +13,7 @@ Every variable in this table is documented in `.env.example`. Copy that file, ed
 | `MAX_CATCHUP_DAYS` | Refuse to run catch-up if this many days have elapsed; ask for explicit backfill instead | `30` | Optional | `14` or `60` |
 | `GIANTS_TEAM_ID` | Reference ID for the Giants (not yet used in filtering) | `137` | Optional | Keep as-is |
 | `LOG_LEVEL` | Python logging level for all pipeline runs | `INFO` | Optional | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `DBT_OUTPUT_MODE` | dbt schema naming mode: `dev` prefixes schemas with `dbt_<username>_`, `production` uses clean names | `dev` | Optional | `production` (for CI/prod) |
 | `UID` | Linux user ID (for file ownership in `data/`). On macOS, leave as-is | `1000` | macOS: optional; Linux: **highly recommended** | Output of `id -u` on your machine |
 | `GID` | Linux group ID. On macOS, leave as-is | `1000` | macOS: optional; Linux: **highly recommended** | Output of `id -g` on your machine |
 
@@ -48,6 +49,15 @@ The MLB Stats API ID for the San Francisco Giants (`137`). Kept here for referen
 **`LOG_LEVEL`**
 
 Controls verbosity of pipeline logs. Set to `DEBUG` for detailed diagnostics when troubleshooting.
+
+**`DBT_OUTPUT_MODE`**
+
+Controls dbt's schema naming strategy:
+
+- **`dev` (default):** Schemas are prefixed with `dbt_<username>_` (e.g., `dbt_derrick_staging`). This isolates each developer's work, preventing schema conflicts when multiple developers run dbt locally.
+- **`production`:** Schemas use clean names without a prefix (e.g., `staging`, `marts`). Use this in CI and production environments.
+
+Leave this at `dev` for local development. Set it to `production` when running in CI or production workflows via an environment variable override.
 
 **`UID` and `GID` (Linux only)**
 
@@ -141,7 +151,9 @@ mlb:
 
 Staging models all:
 - **Materialized as tables** (not views): fast to query, easy to rebuild.
-- **In the `staging` schema.** `dbt/macros/generate_schema_name.sql` makes that the exact name; dbt's default would be `main_staging`.
+- **In the `staging` schema.** The schema name is determined by `dbt/macros/generate_schema_name.sql`:
+  - In **dev mode** (default), the schema becomes `dbt_<username>_staging` (e.g., `dbt_derrick_staging`).
+  - In **production mode** (`DBT_OUTPUT_MODE=production`), the schema is `staging`.
 - **Have descriptions and tests** in their YAML.
 
 Other settings:
@@ -190,10 +202,12 @@ environment:
   DBT_PROFILES_DIR: /app/dbt
   DBT_PROJECT_DIR: /app/dbt
   TZ: America/Los_Angeles
+  USER: ${USER}
 ```
 
 - **`MLB_DATA_DIR: /data`:** Inside the container, the bind-mounted `./data/` is at `/data`. Pipelines write there.
 - **`DBT_PROFILES_DIR` and `DBT_PROJECT_DIR`:** dbt looks here for `profiles.yml` and `dbt_project.yml`.
+- **`USER: ${USER:-dev}`:** Passes your host machine's username to the container for developer-specific schema naming in dev mode (e.g., `dbt_derrick_staging`). Defaults to `dev` if `$USER` is not set. This variable is typically set automatically in your shell on Linux and macOS.
 
 The `dbt` service's entrypoint runs `mkdir -p "$MLB_DATA_DIR/warehouse"` and then `dbt` with your arguments (`build` when none are given). DuckDB won't create a missing folder for its database file, and `data/warehouse` is meant to be deletable.
 - **`TZ: America/Los_Angeles`:** For consistency (MLB games are in various US timezones, but most operations treat times as Pacific). Override if needed.

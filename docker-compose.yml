@@ -11,6 +11,7 @@ x-mlb-base: &mlb-base
     DBT_PROFILES_DIR: /app/dbt
     DBT_PROJECT_DIR: /app/dbt
     TZ: America/Los_Angeles
+    USER: ${USER:-dev}
   volumes:
     - .:/app
     - ./data:/data
