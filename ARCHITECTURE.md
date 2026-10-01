@@ -308,7 +308,13 @@ mlb:
       type: duckdb
       path: "{{ env_var('MLB_DATA_DIR', '../data') }}/warehouse/mlb.duckdb"
       threads: 4
+      settings:   # DuckDB's S3 settings, for reading the lake from R2 (abridged)
+        s3_endpoint: <host of S3_BUCKET_URL>   # else s3.amazonaws.com (unused)
+        s3_url_style: path                     # else vhost
+        s3_region: auto                        # else us-east-1
 ```
+
+Phase 2 (P2M1) added the `settings` block: DuckDB's S3 settings, so dbt can read the lake from R2 when `S3_BUCKET_URL` is set. The keys come from `AWS_*` env vars, which DuckDB reads itself, so no secret is in the profile. The image installs DuckDB's `httpfs` extension at build time from the locked `duckdb-extension-httpfs` package.
 
 `dbt_project.yml`: all staging models `materialized: table`, schema `staging`, and `packages-install-path: /opt/dbt_packages` so installed packages live outside the bind-mounted repo (§9). A `generate_schema_name` override in `dbt/macros/` makes the schema exactly `staging` (dbt's default would be `main_staging`). dbt's anonymous usage stats are off (`flags: send_anonymous_usage_stats: false`), like dlt's telemetry. At this data size (a few million pitches per season) a full rebuild takes seconds to minutes, and it avoids incremental-logic bugs. Revisit incremental only if rebuilds become slow.
 
@@ -326,6 +332,8 @@ sources:
     tables:
       - name: pitches
 ```
+
+(Since Phase 2, P2M1, the path before `/raw_statcast` is the lake root, `s3://<bucket>[/<folder>]` from `S3_BUCKET_URL` or `<MLB_DATA_DIR>/lake`. The rule is in `dbt/macros/lake_root.sql` and repeated inline in the source YAML, which can't call macros.)
 
 `union_by_name = true` matters because columns drift across seasons (§6.5). `env_var()` renders inside source `meta` (verified with dbt-core 1.12 and dbt-duckdb 1.11).
 

@@ -36,5 +36,12 @@ COPY --chown=mlb:mlb . .
 # Switch to non-root user
 USER mlb
 
+# DuckDB's httpfs, so dbt can read the lake from R2 (S3_BUCKET_URL). Installed from the locked
+# PyPI package into this user's ~/.duckdb, so runs never download it. LOAD fails the build if
+# the package's version doesn't match duckdb's.
+RUN python -c "import pathlib, duckdb, duckdb_extension_httpfs as ext; \
+path = pathlib.Path(ext.__file__).parent / 'extensions' / f'v{duckdb.__version__}' / 'httpfs.duckdb_extension'; \
+duckdb.sql(f\"INSTALL '{path}'\"); duckdb.sql('LOAD httpfs')"
+
 # No ENTRYPOINT: `docker compose run --rm pipeline <command>` runs <command> as given
 CMD ["bash"]

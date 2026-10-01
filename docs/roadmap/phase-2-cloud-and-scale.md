@@ -44,7 +44,7 @@ Requires Phase 0 (pipeline and staging) to be complete. Phase 1 (modeling layer)
 
 ### Changes to dbt models
 
-- None in P2M1. Correction found while building P2M1: the sources don't read `S3_BUCKET_URL`. Their `external_location` is `<MLB_DATA_DIR>/lake/...`, and `stg_dlt__completed_loads` globs `<MLB_DATA_DIR>/lake/*/_dlt_loads/*`, so today dbt only sees the local lake. P2M2 has to bridge that for the prod run: either copy the R2 lake to the runner's `<MLB_DATA_DIR>/lake` before `dbt build` (no dbt change), or point the sources at `s3://` through DuckDB's `httpfs` with R2 credentials (a dbt change; check that `glob()` over the marker files works on S3). See Open Questions.
+- Built in P2M1 (decided in PR #12 review, after the first real R2 ingest left dbt reading an empty local lake): dbt reads the lake where dlt wrote it. The sources' `external_location` and `stg_dlt__completed_loads` use a lake root of `s3://<bucket>[/<folder>]` from `S3_BUCKET_URL`, or `<MLB_DATA_DIR>/lake` when it's empty (`dbt/macros/lake_root.sql`, inlined in the source YAML). `profiles.yml` sets DuckDB's `s3_endpoint` / `s3_url_style` / `s3_region` from `S3_BUCKET_URL`; DuckDB reads the `AWS_*` keys from the environment, so no secret is in dbt's SQL or logs. `glob()` over the load markers works on S3 (checked against an S3 emulator, with identical staging row counts to a local build). The image installs `httpfs` from the locked `duckdb-extension-httpfs` PyPI package, so no run downloads it. Only the warehouse file stays local; P2M2 uploads it.
 
 ### Changes to Docker / environment
 
@@ -137,7 +137,7 @@ Revisit only if the project moves to multiple concurrent writers, needs lake-lev
 - What time should the daily scheduled run happen? (Currently 2 AM UTC; adjust based on game schedule and user timezone preference.)
 - Should off-season runs skip or continue? (Tentatively: continue; MVP loads yesterday's games if any, or 0 rows.)
 - Failure notification: silent, GitHub Issues, Slack, email? (Tentatively: GitHub workflow shows red; logs in artifacts; optional Slack for team.)
-- P2M2: how does the prod `dbt build` read the R2 lake? Copy the lake to the runner first (simple, no dbt change, downloads the whole lake each run) or read `s3://` through DuckDB `httpfs` (reads only what it needs, but changes the sources and `stg_dlt__completed_loads`)?
+- ~~P2M2: how does the prod `dbt build` read the R2 lake?~~ Decided in P2M1: dbt reads `s3://` directly through DuckDB `httpfs` (see Changes to dbt models).
 - R2 cost: acceptable for personal project? (Tentatively: yes; ~$5/month for storage at typical ingestion rate.)
 
 ## Status / Decision Log
@@ -146,6 +146,7 @@ Revisit only if the project moves to multiple concurrent writers, needs lake-lev
 - **2026-09-30:** Phase `accepted` and `in progress`. Decisions finalized: R2 + local, GitHub Actions, GitHub Actions Secrets. Milestones P2M1 and P2M2 defined. P2M3 (Delta Lake) deferred. Phase 1 (modeling) marked independent and on hold.
 - **2026-09-30:** P2M1 built. `BUCKET_URL` / `IS_PROD` / `AWS_*` / `R2_ACCOUNT_ID` choose the lake in `config.py`; no code change swaps local and R2. Decisions: empty `BUCKET_URL` is the local default (not `file://./data/lake`, which dlt misreads), `IS_PROD` is enforced in both directions, `R2_BUCKET_NAME` dropped, dbt reading the R2 lake moved to P2M2. Verified with unit tests (no network) and an end-to-end Statcast run against a local S3 emulator (moto), configured only through env vars: Parquet, load markers and state landed in the bucket, and the watermark was restored from the bucket after deleting `dlt_pipelines/`. A run against a real R2 bucket is still to do once the bucket and token exist.
 - **2026-10-01:** First real R2 setup pasted the account endpoint (`https://<id>.r2.cloudflarestorage.com/`) into `BUCKET_URL` and was refused. `BUCKET_URL` now also takes the bucket's S3 API URL from Cloudflare's bucket Settings page, and an account endpoint with no bucket gets an error saying where to find the right URL. Then renamed in PR #12 review: `BUCKET_URL` → `S3_BUCKET_URL` (it holds the bucket's URL, not the account endpoint), taking only that URL. The `s3://` and `file://` forms and `R2_ACCOUNT_ID` are gone, so there is one way to write it, and the variables follow Cloudflare's order. Decided against `R2_API_TOKEN` (unused by the S3 API).
+- **2026-10-01:** dbt reads the lake from R2 too (option 1 of the open question): same `S3_BUCKET_URL`, keys from the environment, `httpfs` baked into the image.
 
 ## References
 

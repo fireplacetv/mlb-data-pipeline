@@ -847,6 +847,21 @@ wheels = [
 ]
 
 [[package]]
+name = "duckdb-extension-httpfs"
+version = "1.5.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "duckdb" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a4/18/b041aea67621e41c4a6f9cc81081572377e94ebe29bf9f65d21ce84bdf24/duckdb_extension_httpfs-1.5.5-py3-none-macosx_11_0_arm64.whl", hash = "sha256:a6d9b245ac83834543354e826020b35b8dba16291bb876b2b00bd49f2c6aeb9d", size = 5562729, upload_time = "2026-08-10T20:10:24.588Z" },
+    { url = "https://files.pythonhosted.org/packages/43/f6/e693b9b8a3e1927f210ddefd6653bed07f3c959721679715a79a22971d44/duckdb_extension_httpfs-1.5.5-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:5dc6e48e7a6d4c775d88fcd9b6529b385559600c0cd17a2600addfdd34ae3060", size = 5693354, upload_time = "2026-08-10T20:10:27.181Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/8f/6461e013a436f16f56ebc8909666c1c46538d86d0e2028359310761e6125/duckdb_extension_httpfs-1.5.5-py3-none-manylinux2014_aarch64.whl", hash = "sha256:567d17e398fc29f7ea4bc42ea277ea19643bd1ad1815f676cb6dd994b50399bb", size = 7254680, upload_time = "2026-08-10T20:10:29.268Z" },
+    { url = "https://files.pythonhosted.org/packages/02/14/921faf933bb5cae7fb477c69f684fbea26bb4d76ff937d19d486af3a54cb/duckdb_extension_httpfs-1.5.5-py3-none-manylinux2014_x86_64.whl", hash = "sha256:84913dbe172ccb54368de2c4a020c38ca8b0e76f99df548f7fac37934cc7826f", size = 7411803, upload_time = "2026-08-10T20:10:31.463Z" },
+    { url = "https://files.pythonhosted.org/packages/37/87/f42a99349fc25805f67daa667f045b296d17106bafe5e8420e4dbfe5d45d/duckdb_extension_httpfs-1.5.5-py3-none-win_amd64.whl", hash = "sha256:138fd4368906c04636642023c123bd564d1bd1b9b75cd762f9f9bfad6fccb1ba", size = 10352303, upload_time = "2026-08-10T20:10:34.255Z" },
+]
+
+[[package]]
 name = "fonttools"
 version = "4.66.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1562,6 +1577,7 @@ dependencies = [
     { name = "dbt-duckdb" },
     { name = "dlt", extra = ["parquet", "s3"] },
     { name = "duckdb" },
+    { name = "duckdb-extension-httpfs" },
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "pybaseball" },
@@ -1579,6 +1595,7 @@ requires-dist = [
     { name = "dbt-duckdb", specifier = ">=1.9.0" },
     { name = "dlt", extras = ["parquet", "s3"], specifier = ">=1.30.0" },
     { name = "duckdb", specifier = ">=1.0.0" },
+    { name = "duckdb-extension-httpfs", specifier = ">=1.5.5" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "pyarrow", specifier = ">=14.0.0" },
     { name = "pybaseball", specifier = ">=0.1.0" },

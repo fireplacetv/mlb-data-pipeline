@@ -7,9 +7,12 @@ sources:
     # Matches the dlt dataset name, so on another warehouse source() resolves to real tables (§8).
     schema: raw_statcast
     meta:
-      # duckdb: dbt-duckdb reads the lake directly; union_by_name absorbs column drift (§6.5)
+      # duckdb: dbt-duckdb reads the lake directly; union_by_name absorbs column drift (§6.5).
+      # The lake root is the R2 bucket in S3_BUCKET_URL (as s3://<bucket>[/<folder>], read with
+      # httpfs) or <MLB_DATA_DIR>/lake: the same rule as macros/lake_root.sql, inlined because
+      # source YAML can't call macros.
       external_location: >
-        read_parquet('{{ env_var("MLB_DATA_DIR", "../data") }}/lake/raw_statcast/{name}/*.parquet',
+        read_parquet('{{ 's3://' ~ env_var('S3_BUCKET_URL').split('/', 3)[3].strip('/') if env_var('S3_BUCKET_URL', '') | trim else env_var('MLB_DATA_DIR', '../data') ~ '/lake' }}/raw_statcast/{name}/*.parquet',
                      union_by_name = true)
     tables:
       - name: pitches

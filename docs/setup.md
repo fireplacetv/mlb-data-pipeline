@@ -192,6 +192,8 @@ Development and CI use the local lake. Production writes the lake to [Cloudflare
 
    The bucket then holds `prod/raw_statcast/pitches/*.parquet`, `prod/raw_statcast/_dlt_loads/`, and `prod/raw_statcast/_dlt_pipeline_state/`, the same layout as `data/lake/`.
 
+   `docker compose run --rm dbt build` then reads the lake from the bucket with the same `.env`, and writes the warehouse locally to `data/warehouse/mlb.duckdb`.
+
 5. **Switch back** by emptying `S3_BUCKET_URL` and setting `IS_PROD=false`. The two settings must agree, or the pipeline refuses to run (see [`docs/configuration.md`](./configuration.md#environment-variable-details)).
 
 **GitHub Actions Secrets** (for the scheduled run, coming in P2M2): in the repository's Settings → Secrets and variables → Actions, add `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` with the token's keys. The workflow writes them into the runner's `.env` as `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, since Compose passes settings to the container only through `.env`.

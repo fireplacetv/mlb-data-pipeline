@@ -73,7 +73,7 @@ The lake layout is the same everywhere: `raw_statcast/pitches/*.parquet`, `raw_m
 
 The AWS-style key names are used because R2 speaks the S3 API, and they're the names Cloudflare's token page uses. For R2 setup (bucket, API token, GitHub Actions Secrets), see [`docs/setup.md`](./setup.md#optional-cloud-lake-on-cloudflare-r2).
 
-dbt still reads the local lake at `<MLB_DATA_DIR>/lake`; reading the lake from R2 is part of the scheduled-run milestone (P2M2 in [`docs/roadmap/phase-2-cloud-and-scale.md`](./roadmap/phase-2-cloud-and-scale.md)).
+dbt reads the lake from the same place: with `S3_BUCKET_URL` set, `dbt build` reads the Parquet and load markers straight from the R2 bucket (see "dbt Configuration" below), so the same `.env` drives ingest and `dbt build`. The warehouse file itself stays local, at `<MLB_DATA_DIR>/warehouse/mlb.duckdb`.
 
 **`DBT_OUTPUT_MODE`**
 
@@ -166,11 +166,16 @@ mlb:
       type: duckdb
       path: "{{ env_var('MLB_DATA_DIR', '../data') }}/warehouse/mlb.duckdb"
       threads: 4
+      settings:   # DuckDB's S3 settings, for reading the lake from R2 (abridged)
+        s3_endpoint: <host of S3_BUCKET_URL>   # else s3.amazonaws.com (unused)
+        s3_url_style: path                     # else vhost
+        s3_region: auto                        # else us-east-1
 ```
 
 - **`type: duckdb`:** Use the DuckDB adapter.
 - **`path`:** Location of the DuckDB database file. Reads `MLB_DATA_DIR` from `.env`; defaults to `../data` if not set.
 - **`threads: 4`:** dbt parallelism. Increase on beefy machines, decrease if DuckDB complains about contention.
+- **`settings`:** DuckDB's S3 settings for reading the lake from R2. With `S3_BUCKET_URL` set, the endpoint is that URL's host (`<account id>.r2.cloudflarestorage.com`), with path-style URLs and region `auto`. With it empty they stay at DuckDB's defaults and nothing reads S3. The keys are **not** here: DuckDB reads `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` from the environment itself, so they never appear in dbt's SQL or in `dbt/logs/`. Reading S3 uses DuckDB's `httpfs` extension, which the image installs at build time from the locked `duckdb-extension-httpfs` package (its version must equal `duckdb`'s; a test and the image build both check it), so builds never download it.
 
 **`dbt/dbt_project.yml`** (defines project structure):
 
@@ -186,7 +191,7 @@ Other settings:
 - **`flags: send_anonymous_usage_stats: false`:** no dbt telemetry.
 - **`vars: check_freshness: false`:** the recency tests on completed loads are off by default. Pass `--vars '{check_freshness: true}'` to turn them on (see `docs/usage.md`).
 
-**Sources** (`dbt/models/staging/*/_*__sources.yml`) read the lake directly with DuckDB's `read_parquet`, at `<MLB_DATA_DIR>/lake/<dataset>/<table>/*.parquet`. `stg_dlt__completed_loads` lists `<MLB_DATA_DIR>/lake/*/_dlt_loads/*`. Like `profiles.yml`, they read `MLB_DATA_DIR` (default `../data`, relative to `dbt/`).
+**Sources** (`dbt/models/staging/*/_*__sources.yml`) read the lake directly with DuckDB's `read_parquet`, at `<lake root>/<dataset>/<table>/*.parquet`. `stg_dlt__completed_loads` lists `<lake root>/*/_dlt_loads/*`. The lake root follows the same rule as the pipelines: `s3://<bucket>[/<folder>]` from `S3_BUCKET_URL` when it's set, else `<MLB_DATA_DIR>/lake` (`MLB_DATA_DIR` defaults to `../data`, relative to `dbt/`). The rule lives in `dbt/macros/lake_root.sql`; the source YAML repeats it inline because dbt doesn't let source YAML call macros, and a test checks the copies match.
 
 ---
 
