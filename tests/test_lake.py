@@ -161,3 +161,46 @@ def test_mlb_api_run_refuses_is_prod_with_local_lake(
     assert code == 2
     assert not (tmp_path / "lake").exists()
     assert "IS_PROD=true needs a remote BUCKET_URL" in caplog.text
+
+
+ACCOUNT = "22a6e718787853845a70714844efe66a"
+S3_API = f"https://{ACCOUNT}.r2.cloudflarestorage.com"
+
+
+def test_bucket_s3_api_url_from_cloudflare_is_remote_r2(tmp_path: Path) -> None:
+    lake = config.resolve_lake(tmp_path, f"{S3_API}/mlb-lake", is_prod=True, **KEYS)
+
+    assert lake.remote
+    assert lake.bucket_url == "s3://mlb-lake"
+    assert lake.endpoint_url == S3_API
+
+
+def test_bucket_s3_api_url_can_name_a_folder(tmp_path: Path) -> None:
+    lake = config.resolve_lake(tmp_path, f"{S3_API}/mlb-lake/prod/", is_prod=True, **KEYS)
+
+    assert lake.bucket_url == "s3://mlb-lake/prod"
+
+
+def test_account_endpoint_without_bucket_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(config.LakeConfigError, match="names no bucket"):
+        config.resolve_lake(tmp_path, f"{S3_API}/", is_prod=True, **KEYS)
+
+
+def test_s3_api_url_with_matching_account_id_is_accepted(tmp_path: Path) -> None:
+    lake = config.resolve_lake(
+        tmp_path, f"{S3_API}/mlb-lake", is_prod=True, r2_account_id=ACCOUNT, **KEYS
+    )
+
+    assert lake.endpoint_url == S3_API
+
+
+def test_s3_api_url_with_other_account_id_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(config.LakeConfigError, match="doesn't match"):
+        config.resolve_lake(
+            tmp_path, f"{S3_API}/mlb-lake", is_prod=True, r2_account_id="abc123", **KEYS
+        )
+
+
+def test_s3_api_url_still_needs_is_prod(tmp_path: Path) -> None:
+    with pytest.raises(config.LakeConfigError, match="IS_PROD"):
+        config.resolve_lake(tmp_path, f"{S3_API}/mlb-lake", is_prod=False, **KEYS)

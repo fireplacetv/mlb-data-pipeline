@@ -35,7 +35,7 @@ Requires Phase 0 (pipeline and staging) to be complete. Phase 1 (modeling layer)
 ### Changes to pipelines
 
 - **dlt destination config:** move from hardcoded `filesystem` with local paths to environment-driven config (built in P2M1).
-  - `BUCKET_URL` env var controls destination: empty (the default) for the local lake at `<MLB_DATA_DIR>/lake` (dev, CI), `file://<path>` for another local folder, `s3://bucket/path` pointing to R2 for prod. Other schemes are refused.
+  - `BUCKET_URL` env var controls destination: empty (the default) for the local lake at `<MLB_DATA_DIR>/lake` (dev, CI), `file://<path>` for another local folder, and for R2 in prod either the bucket's S3 API URL as Cloudflare shows it (`https://<account id>.r2.cloudflarestorage.com/<bucket>[/<folder>]`, which carries the endpoint) or `s3://bucket/path` with `R2_ACCOUNT_ID`. Other schemes are refused.
   - dlt's S3-compatible destination config (R2 uses S3 API) takes `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` env vars, plus `R2_ACCOUNT_ID` for the endpoint `https://<account id>.r2.cloudflarestorage.com` (region `auto`).
   - `IS_PROD` gates it both ways: an `s3://` lake needs `IS_PROD=true`, and `IS_PROD=true` with a local lake is refused. Either mismatch, or missing keys, exits `2` with a message naming the setting.
   - `config.py` reads all of these (`resolve_lake`) and `pipelines/common.py` builds the dlt destination and credentials in code, the same way `bucket_url` was already set in code. `.dlt/config.toml` doesn't change: no new sections are needed.
@@ -146,6 +146,7 @@ Revisit only if the project moves to multiple concurrent writers, needs lake-lev
 - **2026-09-27:** Phase marked as `proposed` with stub design.
 - **2026-09-30:** Phase `accepted` and `in progress`. Decisions finalized: R2 + local, GitHub Actions, GitHub Actions Secrets. Milestones P2M1 and P2M2 defined. P2M3 (Delta Lake) deferred. Phase 1 (modeling) marked independent and on hold.
 - **2026-09-30:** P2M1 built. `BUCKET_URL` / `IS_PROD` / `AWS_*` / `R2_ACCOUNT_ID` choose the lake in `config.py`; no code change swaps local and R2. Decisions: empty `BUCKET_URL` is the local default (not `file://./data/lake`, which dlt misreads), `IS_PROD` is enforced in both directions, `R2_BUCKET_NAME` dropped, dbt reading the R2 lake moved to P2M2. Verified with unit tests (no network) and an end-to-end Statcast run against a local S3 emulator (moto), configured only through env vars: Parquet, load markers and state landed in the bucket, and the watermark was restored from the bucket after deleting `dlt_pipelines/`. A run against a real R2 bucket is still to do once the bucket and token exist.
+- **2026-10-01:** First real R2 setup pasted the account endpoint (`https://<id>.r2.cloudflarestorage.com/`) into `BUCKET_URL` and was refused. `BUCKET_URL` now also takes the bucket's S3 API URL from Cloudflare's bucket Settings page, and an account endpoint with no bucket gets an error saying where to find the right URL. Naming (`BUCKET_URL` vs `S3_API_ENDPOINT`, `R2_ACCOUNT_ID`) is under review on PR #12.
 
 ## References
 

@@ -6,6 +6,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
 
@@ -117,9 +118,11 @@ def resolve_lake(
     """Turn the lake settings into a Lake, failing loudly on a risky or incomplete setup.
 
     An empty bucket_url is the local lake, data_dir/lake. A file:// URL is a local folder,
-    relative to the working directory. An s3:// URL is remote and needs is_prod (so a dev
-    run never writes the production lake by accident) and both credentials; r2_account_id
-    points it at R2. is_prod with a local lake is refused too, so a prod run with a missing
+    relative to the working directory. A remote lake is either s3://<bucket>/<path>, with
+    r2_account_id pointing it at R2, or the bucket's S3 API URL as Cloudflare shows it,
+    https://<account id>.r2.cloudflarestorage.com/<bucket>[/<path>]. A remote lake needs
+    is_prod (so a dev run never writes the production lake by accident) and both
+    credentials. is_prod with a local lake is refused too, so a prod run with a missing
     BUCKET_URL can't quietly write to a throwaway disk.
     """
     if not bucket_url:
@@ -128,11 +131,16 @@ def resolve_lake(
         # dlt reads file://./x as /x, so resolve relative paths here.
         lake = Lake(str(Path(bucket_url.removeprefix("file://")).resolve()), remote=False)
     elif bucket_url.startswith("s3://"):
-        lake = _remote_lake(bucket_url, is_prod, access_key_id, secret_access_key, r2_account_id)
+        endpoint = r2_endpoint_url(r2_account_id) if r2_account_id else None
+        lake = _remote_lake(bucket_url, endpoint, is_prod, access_key_id, secret_access_key)
+    elif bucket_url.startswith("https://"):
+        s3_url, endpoint = _split_s3_api_url(bucket_url, r2_account_id)
+        lake = _remote_lake(s3_url, endpoint, is_prod, access_key_id, secret_access_key)
     else:
         raise LakeConfigError(
             f"BUCKET_URL={bucket_url!r} is not supported: leave it empty for the local lake, "
-            "or use file://<path> or s3://<bucket>/<path> (R2)"
+            "or use the bucket's S3 API URL (https://<account id>.r2.cloudflarestorage.com/"
+            "<bucket>), s3://<bucket>/<path>, or file://<path>"
         )
     if is_prod and not lake.remote:
         raise LakeConfigError(
@@ -142,8 +150,34 @@ def resolve_lake(
     return lake
 
 
+def _split_s3_api_url(url: str, r2_account_id: str) -> tuple[str, str]:
+    """Split https://<host>/<bucket>[/<path>] into (s3://<bucket>[/<path>], https://<host>).
+
+    The URL must name a bucket: the account endpoint alone (https://<host>/) says where R2
+    is, not where the lake goes. An R2_ACCOUNT_ID that names another account is refused.
+    """
+    parts = urlsplit(url)
+    path = parts.path.strip("/")
+    if not path:
+        raise LakeConfigError(
+            f"BUCKET_URL={url} names no bucket. Use the bucket's S3 API URL from its Settings "
+            f"page ({url.rstrip('/')}/<bucket>), optionally with a folder: .../<bucket>/prod"
+        )
+    endpoint = f"https://{parts.netloc}"
+    if r2_account_id and endpoint != r2_endpoint_url(r2_account_id):
+        raise LakeConfigError(
+            f"R2_ACCOUNT_ID={r2_account_id} doesn't match BUCKET_URL's endpoint {endpoint}; "
+            "the URL already holds the account ID, so leave R2_ACCOUNT_ID empty"
+        )
+    return f"s3://{path}", endpoint
+
+
 def _remote_lake(
-    bucket_url: str, is_prod: bool, access_key_id: str, secret_access_key: str, account_id: str
+    bucket_url: str,
+    endpoint_url: str | None,
+    is_prod: bool,
+    access_key_id: str,
+    secret_access_key: str,
 ) -> Lake:
     """Validate the settings for an s3:// lake and return it."""
     if not is_prod:
@@ -164,7 +198,7 @@ def _remote_lake(
     return Lake(
         bucket_url.rstrip("/"),
         remote=True,
-        endpoint_url=r2_endpoint_url(account_id) if account_id else None,
+        endpoint_url=endpoint_url,
         access_key_id=access_key_id,
         secret_access_key=secret_access_key,
     )

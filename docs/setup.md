@@ -170,17 +170,18 @@ Then re-run the ingest commands.
 
 Development and CI use the local lake. Production writes the lake to [Cloudflare R2](https://developers.cloudflare.com/r2/), an S3-compatible object store, so it outlives any one machine. You only need this if you run the production pipeline.
 
-1. **Create a bucket.** In the Cloudflare dashboard, go to R2 → Create bucket (for example `mlb-lake`). Note your **account ID**, shown on the R2 overview page.
+1. **Create a bucket.** In the Cloudflare dashboard, go to R2 Object Storage → Create bucket (for example `mlb-lake`). Then open the bucket's **Settings** tab and copy its **S3 API** URL, `https://<account id>.r2.cloudflarestorage.com/mlb-lake`. (The R2 overview and token pages show a shorter URL that stops at `.com/`. That's the account endpoint, and it won't work here because it names no bucket.)
 2. **Create an API token.** R2 → Manage R2 API Tokens → Create API token, with **Object Read & Write** permission, scoped to that bucket. Copy the **Access Key ID** and **Secret Access Key** (the secret is shown once).
 3. **Point the pipeline at it.** In your `.env` (never in `.env.example`):
 
    ```bash
-   BUCKET_URL=s3://mlb-lake/prod
+   BUCKET_URL=https://<account id>.r2.cloudflarestorage.com/mlb-lake/prod
    IS_PROD=true
    AWS_ACCESS_KEY_ID=<access key id>
    AWS_SECRET_ACCESS_KEY=<secret access key>
-   R2_ACCOUNT_ID=<account id>
    ```
+
+   That's the S3 API URL from step 1 with a folder (`/prod`) added, so the lake sits in a folder of the bucket. `R2_ACCOUNT_ID` stays empty: the ID is already in the URL. (Equivalently, `BUCKET_URL=s3://mlb-lake/prod` plus `R2_ACCOUNT_ID=<account id>`.)
 
 4. **Run an ingest and check the destination.** The first log line of the run names it:
 
