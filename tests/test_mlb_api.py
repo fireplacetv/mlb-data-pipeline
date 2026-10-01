@@ -92,6 +92,7 @@ def run_pipeline(tmp_path: Path) -> Callable[..., int]:
         start: date | None = None,
         end: date | None = None,
         *,
+        chunk_days: int | None = None,
         today: date = date(2025, 9, 3),
         api: FakeStatsApi | None = None,
     ) -> int:
@@ -100,6 +101,7 @@ def run_pipeline(tmp_path: Path) -> Callable[..., int]:
         return mlb_api.run(
             start,
             end,
+            chunk_days=chunk_days,
             data_dir=tmp_path,
             schema_dir=tmp_path / "schemas",
             today=today,
@@ -121,6 +123,15 @@ def table(tmp_path: Path, name: str) -> list[dict]:
 def watermark(tmp_path: Path) -> date | None:
     """Read the watermark the way the next run would, restoring from the lake."""
     return mlb_api.restore_watermark(mlb_api.build_pipeline(tmp_path, tmp_path / "schemas"))
+
+
+def backfill_mark(tmp_path: Path) -> date | None:
+    """Read the automatic backfill's progress mark, restoring from the lake."""
+    return mlb_api.restore_backfill_mark(mlb_api.build_pipeline(tmp_path, tmp_path / "schemas"))
+
+
+def requested_days(api: FakeStatsApi) -> list[str]:
+    return sorted({q["startDate"] for _, q in api.calls("schedule")})
 
 
 def test_backfill_writes_expected_tables_and_markers(tmp_path: Path, run_pipeline) -> None:
@@ -271,7 +282,9 @@ def test_people_fetched_ids_survive_deleting_pipelines_dir(tmp_path: Path, run_p
 
 
 def test_people_requests_are_batched() -> None:
-    ids = mlb_api.new_person_ids(set(range(1, 251)), None, window_of(1), [])
+    ids = mlb_api.new_person_ids(
+        set(range(1, 251)), None, mlb_api.common.WATERMARK_KEY, window_of(1), []
+    )
     batches = list(ids)
     assert [len(b["person_ids"].split(",")) for b in batches] == [100, 100, 50]
 
@@ -317,3 +330,92 @@ def test_parse_args_requires_both_dates() -> None:
         mlb_api.parse_args(["--end", "2025-09-02"])
     args = mlb_api.parse_args(["--start", "2025-09-01", "--end", "2025-09-02"])
     assert (args.start, args.end) == (date(2025, 9, 1), date(2025, 9, 2))
+
+
+def test_parse_args_rejects_chunk_days_with_explicit_range() -> None:
+    with pytest.raises(SystemExit):
+        mlb_api.parse_args(["--start", "2025-09-01", "--end", "2025-09-02", "--chunk-days", "5"])
+    args = mlb_api.parse_args(["--chunk-days", "5"])
+    assert args.chunk_days == 5
+
+
+def test_parse_args_chunk_days_defaults_when_given_no_value() -> None:
+    args = mlb_api.parse_args(["--chunk-days"])
+    assert args.chunk_days == mlb_api.config.BACKFILL_CHUNK_DAYS
+    assert mlb_api.parse_args([]).chunk_days is None
+
+
+def test_parse_args_rejects_non_positive_chunk_days() -> None:
+    with pytest.raises(SystemExit):
+        mlb_api.parse_args(["--chunk-days", "0"])
+
+
+def test_chunk_days_backfills_from_configured_floor(
+    tmp_path: Path, run_pipeline, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(mlb_api.config, "BACKFILL_START", date(2025, 8, 25))
+    api = FakeStatsApi()
+
+    assert run_pipeline(chunk_days=5, today=date(2025, 9, 3), api=api) == 0
+
+    assert requested_days(api) == [f"2025-08-{d}" for d in (25, 26, 27, 28, 29)]
+    assert backfill_mark(tmp_path) == date(2025, 8, 29)
+    assert watermark(tmp_path) is None  # the catch-up watermark is untouched
+
+
+def test_chunk_days_resumes_from_its_own_mark(
+    tmp_path: Path, run_pipeline, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(mlb_api.config, "BACKFILL_START", date(2025, 8, 25))
+    run_pipeline(chunk_days=2, today=date(2025, 9, 3))
+
+    api = FakeStatsApi()
+    assert run_pipeline(chunk_days=2, today=date(2025, 9, 3), api=api) == 0
+
+    assert requested_days(api) == ["2025-08-27", "2025-08-28"]
+    assert backfill_mark(tmp_path) == date(2025, 8, 28)
+
+
+def test_chunk_days_is_independent_of_the_catchup_watermark(
+    tmp_path: Path, run_pipeline, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(mlb_api.config, "BACKFILL_START", date(2015, 4, 1))
+    run_pipeline(date(2025, 9, 1), date(2025, 9, 2))  # a normal (manual) load sets loaded_through
+    caught_up_to = watermark(tmp_path)
+    assert caught_up_to == date(2025, 9, 2)
+
+    api = FakeStatsApi()
+    assert run_pipeline(chunk_days=3, today=date(2025, 9, 3), api=api) == 0
+
+    assert requested_days(api)[0] == "2015-04-01"  # not held back by the catch-up watermark
+    assert watermark(tmp_path) == caught_up_to  # and doesn't move it either
+
+
+def test_chunk_days_terminus_is_a_noop(
+    tmp_path: Path, run_pipeline, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(mlb_api.config, "BACKFILL_START", date(2025, 9, 8))
+    assert run_pipeline(chunk_days=10, today=date(2025, 9, 10)) == 0
+    assert backfill_mark(tmp_path) == date(2025, 9, 9)  # capped at yesterday
+
+    api = FakeStatsApi()
+    with caplog.at_level("INFO"):
+        assert run_pipeline(chunk_days=10, today=date(2025, 9, 10), api=api) == 0
+
+    assert api.requests == []
+    assert "backfill complete" in caplog.text.lower()
+
+
+def test_chunk_days_failed_day_holds_mark_for_a_retry(
+    tmp_path: Path, run_pipeline, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(mlb_api.config, "BACKFILL_START", date(2025, 8, 25))
+    failing = FakeStatsApi(failing_days={"2025-08-26"})
+
+    assert run_pipeline(chunk_days=3, today=date(2025, 9, 3), api=failing) == 1
+    assert backfill_mark(tmp_path) is None  # the failure was inside the first chunk
+
+    api = FakeStatsApi()
+    assert run_pipeline(chunk_days=3, today=date(2025, 9, 3), api=api) == 0
+    assert requested_days(api) == ["2025-08-25", "2025-08-26", "2025-08-27"]  # retried
+    assert backfill_mark(tmp_path) == date(2025, 8, 27)

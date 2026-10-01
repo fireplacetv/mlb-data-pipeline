@@ -10,6 +10,7 @@ import pyarrow.parquet as pq
 import pytest
 from pybaseball.datasources.statcast import get_statcast_data_from_csv
 
+from mlb import config
 from mlb.pipelines import common, statcast
 
 FIXTURE = Path(__file__).parent / "fixtures" / "statcast" / "statcast_2025-09-01.csv"
@@ -48,12 +49,14 @@ def run_pipeline(tmp_path: Path) -> Callable[..., int]:
         start: date | None = None,
         end: date | None = None,
         *,
+        chunk_days: int | None = None,
         today: date = date(2025, 9, 10),
         savant: FakeSavant | None = None,
     ) -> int:
         return statcast.run(
             start,
             end,
+            chunk_days=chunk_days,
             data_dir=tmp_path,
             schema_dir=tmp_path / "schemas",
             today=today,
@@ -85,6 +88,11 @@ def pitches(tmp_path: Path) -> pd.DataFrame:
 def watermark(tmp_path: Path) -> date | None:
     """Read the watermark the way the next run would, restoring from the lake."""
     return statcast.restore_watermark(statcast.build_pipeline(tmp_path, tmp_path / "schemas"))
+
+
+def backfill_mark(tmp_path: Path) -> date | None:
+    """Read the automatic backfill's progress mark, restoring from the lake."""
+    return statcast.restore_backfill_mark(statcast.build_pipeline(tmp_path, tmp_path / "schemas"))
 
 
 def test_backfill_writes_parquet_marker_and_schema(tmp_path: Path, run_pipeline) -> None:
@@ -233,3 +241,93 @@ def test_parse_args_requires_both_dates() -> None:
         statcast.parse_args(["--start", "2025-09-01"])
     args = statcast.parse_args(["--start", "2025-09-01", "--end", "2025-09-02"])
     assert (args.start, args.end) == (date(2025, 9, 1), date(2025, 9, 2))
+
+
+def test_parse_args_rejects_chunk_days_with_explicit_range() -> None:
+    with pytest.raises(SystemExit):
+        statcast.parse_args(["--start", "2025-09-01", "--end", "2025-09-02", "--chunk-days", "5"])
+    args = statcast.parse_args(["--chunk-days", "5"])
+    assert args.chunk_days == 5
+
+
+def test_parse_args_chunk_days_defaults_when_given_no_value() -> None:
+    args = statcast.parse_args(["--chunk-days"])
+    assert args.chunk_days == config.BACKFILL_CHUNK_DAYS
+    assert statcast.parse_args([]).chunk_days is None
+
+
+def test_parse_args_rejects_non_positive_chunk_days() -> None:
+    with pytest.raises(SystemExit):
+        statcast.parse_args(["--chunk-days", "0"])
+
+
+def test_chunk_days_backfills_from_configured_floor(
+    tmp_path: Path, run_pipeline, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(config, "BACKFILL_START", date(2025, 8, 30))
+    savant = FakeSavant()
+
+    assert run_pipeline(chunk_days=5, today=date(2025, 9, 10), savant=savant) == 0
+
+    assert savant.calls == [date(2025, 8, d) for d in (30, 31)] + [
+        date(2025, 9, d) for d in (1, 2, 3)
+    ]
+    assert backfill_mark(tmp_path) == date(2025, 9, 3)
+    assert watermark(tmp_path) is None  # the catch-up watermark is untouched
+
+
+def test_chunk_days_resumes_from_its_own_mark(
+    tmp_path: Path, run_pipeline, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(config, "BACKFILL_START", date(2025, 9, 1))
+    run_pipeline(chunk_days=2, today=date(2025, 9, 10))
+
+    savant = FakeSavant()
+    assert run_pipeline(chunk_days=2, today=date(2025, 9, 10), savant=savant) == 0
+
+    assert savant.calls == [date(2025, 9, 3), date(2025, 9, 4)]
+    assert backfill_mark(tmp_path) == date(2025, 9, 4)
+
+
+def test_chunk_days_is_independent_of_the_catchup_watermark(
+    tmp_path: Path, run_pipeline, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(config, "BACKFILL_START", date(2015, 4, 1))
+    run_pipeline(today=date(2025, 9, 10))  # a normal catch-up sets loaded_through
+    caught_up_to = watermark(tmp_path)
+    assert caught_up_to is not None
+
+    savant = FakeSavant()
+    assert run_pipeline(chunk_days=3, today=date(2025, 9, 10), savant=savant) == 0
+
+    assert savant.calls[0] == date(2015, 4, 1)  # not held back by the catch-up watermark
+    assert watermark(tmp_path) == caught_up_to  # and doesn't move it either
+
+
+def test_chunk_days_terminus_is_a_noop(
+    tmp_path: Path, run_pipeline, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(config, "BACKFILL_START", date(2025, 9, 8))
+    assert run_pipeline(chunk_days=10, today=date(2025, 9, 10)) == 0
+    assert backfill_mark(tmp_path) == date(2025, 9, 9)  # capped at yesterday
+
+    savant = FakeSavant()
+    with caplog.at_level("INFO"):
+        assert run_pipeline(chunk_days=10, today=date(2025, 9, 10), savant=savant) == 0
+
+    assert savant.calls == []
+    assert "backfill complete" in caplog.text.lower()
+
+
+def test_chunk_days_failed_day_holds_mark_for_a_retry(
+    tmp_path: Path, run_pipeline, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(config, "BACKFILL_START", date(2025, 9, 1))
+    failing = FakeSavant(failing={date(2025, 9, 2)})
+
+    assert run_pipeline(chunk_days=3, today=date(2025, 9, 10), savant=failing) == 1
+    assert backfill_mark(tmp_path) is None  # the failure was on the first day of the chunk
+
+    savant = FakeSavant()
+    assert run_pipeline(chunk_days=3, today=date(2025, 9, 10), savant=savant) == 0
+    assert savant.calls == [date(2025, 9, 1), date(2025, 9, 2), date(2025, 9, 3)]  # retried

@@ -1,0 +1,103 @@
+name: Automatic backfill
+
+# Steadily backfills history (BACKFILL_START, default 2015-04-01, through yesterday) into
+# the R2 lake, a few bounded days at a time (docs/roadmap/phase-2-cloud-and-scale.md, P2M4).
+# Each firing runs the pipelines with --chunk-days: load BACKFILL_CHUNK_DAYS days from the
+# backfilled_through mark (tracked separately from scheduled-ingest's catch-up watermark),
+# then stop and exit. That keeps every firing a single, bounded dlt load that completes and
+# commits well inside the timeout below, so the next firing always resumes right where this
+# one left off -- unlike relying on a timeout to kill one huge `pipeline.run()` mid-backfill,
+# which commits nothing and restarts from scratch forever (see P2M4's design note). Once
+# backfilled_through reaches yesterday, a firing logs "Backfill complete" and exits 0 having
+# loaded nothing; the schedule keeps firing, but every run after that is a fast no-op.
+on:
+  schedule:
+    # Once a day. Offset from scheduled-ingest's 2 AM UTC catch-up so the two aren't both
+    # trying to start in the same shared concurrency slot at once.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      chunk_days:
+        description: "Days to load this run (optional; defaults to BACKFILL_CHUNK_DAYS)."
+        required: false
+
+concurrency:
+  # Shares scheduled-ingest's group, not a group of its own: both workflows write the same
+  # R2 lake and pipeline state, which assumes a single writer. A long chunk can therefore
+  # push that day's catch-up out of the queue; the next day's catch-up self-heals via
+  # LOOKBACK_DAYS. Chunks are sized (BACKFILL_CHUNK_DAYS, default 30 days) to finish in
+  # minutes, well under this job's own timeout, so the shared slot isn't held for long.
+  group: scheduled-ingest
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    name: Automatic backfill (production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure environment
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          S3_BUCKET_URL: ${{ vars.S3_BUCKET_URL }}
+        run: |
+          # Values come from the environment, never interpolated into a shell command, so a
+          # key or URL with regex-special characters can't corrupt the substitution.
+          python3 - <<'PYEOF'
+          import os
+          import re
+          from pathlib import Path
+
+          overrides = {
+              "UID": str(os.getuid()),
+              "GID": str(os.getgid()),
+              "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+              "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+              "S3_BUCKET_URL": os.environ["S3_BUCKET_URL"],
+              "IS_PROD": "true",
+          }
+          text = Path(".env.example").read_text()
+          for key, value in overrides.items():
+              text = re.sub(rf"(?m)^{key}=.*$", f"{key}={value}", text)
+          Path(".env").write_text(text)
+          PYEOF
+          mkdir -p data
+
+      - name: Build image
+        run: docker compose build
+
+      # --chunk-days with no number uses BACKFILL_CHUNK_DAYS (config.py, default 30 days).
+      # A manual dispatch can override it for one run via the chunk_days input; the
+      # recurring schedule always uses the default, changed by editing BACKFILL_CHUNK_DAYS
+      # in .env.example. No dbt build or warehouse upload here: scheduled-ingest already
+      # rebuilds the warehouse from the lake on its own daily schedule, so doing it again on
+      # every backfill chunk would be pure waste and would hold the shared slot longer.
+      - name: Backfill Statcast
+        env:
+          CHUNK_DAYS: ${{ inputs.chunk_days }}
+        run: |
+          args=(--chunk-days)
+          if [ -n "$CHUNK_DAYS" ]; then args+=("$CHUNK_DAYS"); fi
+          docker compose run --rm pipeline python -m mlb.pipelines.statcast "${args[@]}"
+
+      - name: Backfill MLB Stats API
+        env:
+          CHUNK_DAYS: ${{ inputs.chunk_days }}
+        run: |
+          args=(--chunk-days)
+          if [ -n "$CHUNK_DAYS" ]; then args+=("$CHUNK_DAYS"); fi
+          docker compose run --rm pipeline python -m mlb.pipelines.mlb_api "${args[@]}"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backfill-logs
+          path: data/logs/
+          if-no-files-found: ignore
