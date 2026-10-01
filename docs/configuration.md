@@ -134,6 +134,9 @@ layout = "{table_name}/{load_id}.{file_id}.{ext}"
 
 [normalize.parquet_normalizer]
 add_dlt_load_id = true
+
+[data_writer]
+arrow_concat_promote_options = "default"
 ```
 
 dlt reads this file from the working directory, so run pipelines from the repo root (the container's `/app`, which is the default).
@@ -144,6 +147,7 @@ dlt reads this file from the working directory, so run pipelines from the repo r
 - **`runtime.dlthub_telemetry`:** Off, so runs and tests make no network calls beyond the data sources.
 - **`destination.filesystem`:** File layout for the lake. The layout `{table_name}/{load_id}.{file_id}.{ext}` organizes Parquet files into folders per table, with one file per load. This is the default and is what staging expects. The lake location (`bucket_url`) isn't set here: the pipelines set it in code to `<MLB_DATA_DIR>/lake`.
 - **`normalize.parquet_normalizer.add_dlt_load_id`:** The Statcast pipeline yields DataFrames, and dlt only adds the `_dlt_load_id` column to DataFrame/Arrow rows when this is on. Staging deduplicates on `_dlt_load_id`, so leave it on.
+- **`data_writer.arrow_concat_promote_options`:** Statcast columns occasionally change type day to day within the same run (for example `arm_angle`: `int64` one day, `double` another) — a routine case, not just large backfills, since every catch-up run buffers `LOOKBACK_DAYS + 1` days together (§6.5). dlt's default, `"none"`, raises `IncompatibleArrowSchema` the moment two buffered days disagree. `"default"` instead writes the incompatible day to its own Parquet file, which `read_parquet(union_by_name=true)` already reconciles like any other cross-file column drift (§7.2), and staging casts key numeric columns explicitly anyway.
 
 ### Secrets (`.dlt/secrets.toml`, not checked in)
 
