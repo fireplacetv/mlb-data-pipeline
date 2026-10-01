@@ -7,9 +7,9 @@ name: Scheduled ingest
 # from the GitHub UI.
 on:
   schedule:
-    # 2 AM UTC, after US games end and before US morning. Runs year-round; off-season
+    # 9 AM UTC, after US games end and before US morning. Runs year-round; off-season
     # days load zero games (the pipelines already skip dates outside the season).
-    - cron: "0 2 * * *"
+    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       start:
