@@ -11,11 +11,13 @@ version = "0.1.0"
 description = "ELT data pipeline for MLB Statcast and Stats API data"
 requires-python = ">=3.12"
 dependencies = [
-    "dlt[parquet]>=1.30.0",
+    "dlt[parquet,s3]>=1.30.0",
     "pybaseball>=0.1.0",
     "pandas>=2.0.0",
     "pyarrow>=14.0.0",
     "duckdb>=1.0.0",
+    # DuckDB's httpfs, so dbt can read the R2 lake; its version must equal duckdb's.
+    "duckdb-extension-httpfs>=1.5.5",
     "dbt-core>=1.9.0",
     "dbt-duckdb>=1.9.0",
 ]

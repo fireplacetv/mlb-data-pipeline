@@ -2,8 +2,9 @@
 -- <lake>/<dataset>/_dlt_loads/<schema>__<load_id>.jsonl when a load finishes (§6.2).
 with marker_files as (
     select file
-    -- duckdb: glob() lists files and returns no rows (not an error) when none match
-    from glob('{{ env_var("MLB_DATA_DIR", "../data") }}/lake/*/_dlt_loads/*')
+    -- duckdb: glob() lists files (locally, or in R2 through httpfs) and returns no rows
+    -- (not an error) when none match
+    from glob('{{ lake_root() }}/*/_dlt_loads/*')
 ),
 
 parsed as (

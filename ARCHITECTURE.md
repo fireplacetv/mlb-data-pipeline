@@ -52,7 +52,7 @@ A containerized **ELT data pipeline** for MLB data:
 |---|---|---|
 | Language / env | Python 3.12, `uv` | Pin versions in `pyproject.toml` / `uv.lock` |
 | Dev environment | Docker + Docker Compose | One image for pipeline, dbt, and tests (§9) |
-| Extract + load | `dlt` | `filesystem` destination, Parquet format |
+| Extract + load | `dlt` | `filesystem` destination, Parquet format: local folder for dev/CI, S3-compatible (Cloudflare R2) for prod (Phase 2, `S3_BUCKET_URL`) |
 | Statcast access | `pybaseball` | Wrapped as a dlt resource |
 | MLB Stats API | `dlt` REST API source | `https://statsapi.mlb.com`, no auth |
 | Raw storage | Parquet on local disk | `data/lake/` |
@@ -62,7 +62,7 @@ A containerized **ELT data pipeline** for MLB data:
 | Data report | Evidence (open-source static build, Node) | `reports/`; its own `node` service, not the Python image (§9.3) |
 
 **Python dependencies** (declared in `pyproject.toml`, locked in `uv.lock`):
-- Runtime: `dlt[parquet]`, `pybaseball`, `pandas`, `pyarrow`, `duckdb`, `dbt-core`, `dbt-duckdb`
+- Runtime: `dlt[parquet,s3]` (the `s3` extra adds `s3fs` for the R2 lake), `pybaseball`, `pandas`, `pyarrow`, `duckdb`, `dbt-core`, `dbt-duckdb`
 - Dev (a `dev` dependency group, also installed in the image): `pytest`, `ruff`
 
 pybaseball is lightly maintained and pins older libraries in places. M0 must confirm it installs and imports on Python 3.12 alongside current pandas and numpy. If it doesn't, pin compatible versions, or drop to Python 3.11, and record the decision in `docs/configuration.md`.
@@ -182,7 +182,7 @@ The pybaseball README notes that Statcast data can change even for past seasons.
 
 ### 6.2 Common settings
 
-- Destination: `filesystem`, `bucket_url = <MLB_DATA_DIR>/lake`, file format `parquet`, default layout `{table_name}/{load_id}.{file_id}.{ext}`. Set `bucket_url` in code from `MLB_DATA_DIR`. `.dlt/config.toml` holds only static settings.
+- Destination: `filesystem`, `bucket_url = <MLB_DATA_DIR>/lake`, file format `parquet`, default layout `{table_name}/{load_id}.{file_id}.{ext}`. Set `bucket_url` in code from `MLB_DATA_DIR`. `.dlt/config.toml` holds only static settings. Phase 2 (P2M1) adds `S3_BUCKET_URL`: when set, the lake goes there instead (a Cloudflare R2 bucket in prod, given as the bucket's S3 API URL and gated by `IS_PROD`); see `docs/roadmap/phase-2-cloud-and-scale.md` and `docs/configuration.md`.
 - Write disposition: **`append` for every resource.** Don't use `replace`: on the filesystem destination it deletes the table's existing files, which breaks principle 1 and would drop earlier seasons. Staging deduplicates instead.
 - Each pipeline has its own `pipeline_name` and `dataset_name`. dlt syncs pipeline state to the destination (`_dlt_pipeline_state/`).
 - Set `pipelines_dir` to `<MLB_DATA_DIR>/dlt_pipelines`. Containers run with `--rm`, so dlt's home-directory default would be lost after every run.
@@ -308,7 +308,13 @@ mlb:
       type: duckdb
       path: "{{ env_var('MLB_DATA_DIR', '../data') }}/warehouse/mlb.duckdb"
       threads: 4
+      settings:   # DuckDB's S3 settings, for reading the lake from R2 (abridged)
+        s3_endpoint: <host of S3_BUCKET_URL>   # else s3.amazonaws.com (unused)
+        s3_url_style: path                     # else vhost
+        s3_region: auto                        # else us-east-1
 ```
+
+Phase 2 (P2M1) added the `settings` block: DuckDB's S3 settings, so dbt can read the lake from R2 when `S3_BUCKET_URL` is set. The keys come from `AWS_*` env vars, which DuckDB reads itself, so no secret is in the profile. The image installs DuckDB's `httpfs` extension at build time from the locked `duckdb-extension-httpfs` package.
 
 `dbt_project.yml`: all staging models `materialized: table`, schema `staging`, and `packages-install-path: /opt/dbt_packages` so installed packages live outside the bind-mounted repo (§9). A `generate_schema_name` override in `dbt/macros/` makes the schema exactly `staging` (dbt's default would be `main_staging`). dbt's anonymous usage stats are off (`flags: send_anonymous_usage_stats: false`), like dlt's telemetry. At this data size (a few million pitches per season) a full rebuild takes seconds to minutes, and it avoids incremental-logic bugs. Revisit incremental only if rebuilds become slow.
 
@@ -326,6 +332,8 @@ sources:
     tables:
       - name: pitches
 ```
+
+(Since Phase 2, P2M1, the path before `/raw_statcast` is the lake root, `s3://<bucket>[/<folder>]` from `S3_BUCKET_URL` or `<MLB_DATA_DIR>/lake`. The rule is in `dbt/macros/lake_root.sql` and repeated inline in the source YAML, which can't call macros.)
 
 `union_by_name = true` matters because columns drift across seasons (§6.5). `env_var()` renders inside source `meta` (verified with dbt-core 1.12 and dbt-duckdb 1.11).
 
@@ -502,7 +510,7 @@ services:
 - Every path comes from `MLB_DATA_DIR`. Never hard-code `./data` or `/data`.
 - One-shot commands only: `docker compose run --rm`. No long-running services. (The report's dev server is started the same way and stopped with Ctrl-C.)
 - No data or secrets in the image. `.env` is read at runtime.
-- `.env.example` documents `MLB_DATA_DIR`, `LOOKBACK_DAYS`, `MAX_CATCHUP_DAYS`, `GIANTS_TEAM_ID`, `LOG_LEVEL`, and the `UID`/`GID` note for Linux.
+- `.env.example` documents `MLB_DATA_DIR`, `LOOKBACK_DAYS`, `MAX_CATCHUP_DAYS`, `GIANTS_TEAM_ID`, `LOG_LEVEL`, the `UID`/`GID` note for Linux, and (Phase 2) the lake destination: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_URL`, `IS_PROD`.
 - Only one process may write `mlb.duckdb` at a time.
 - Outbound HTTPS needed: `statsapi.mlb.com`, `baseballsavant.mlb.com`, plus PyPI and the dbt package hub at build time. The report (§9.3) also needs Docker Hub (`node` image), the npm registry, and `extensions.duckdb.org` (DuckDB's Parquet extension for WebAssembly, fetched when the report builds and again in the viewer's browser). No inbound ports, except the report's local dev server.
 

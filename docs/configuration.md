@@ -1,6 +1,6 @@
 # Configuration Reference
 
-All settings live in `.env` (read by Docker Compose at runtime) and `.dlt/config.toml` (static dlt configuration). No secrets are committed; `.env` is gitignored.
+All settings live in `.env` (read by Docker Compose at runtime) and `.dlt/config.toml` (static dlt configuration). No secrets are committed; `.env` is gitignored. The only secrets are the optional cloud-lake credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`), which go in your own `.env` or in GitHub Actions Secrets.
 
 ## Environment Variables (`.env`)
 
@@ -13,6 +13,10 @@ Every variable in this table is documented in `.env.example`. Copy that file, ed
 | `MAX_CATCHUP_DAYS` | Refuse to run catch-up if this many days have elapsed; ask for explicit backfill instead | `30` | Optional | `14` or `60` |
 | `GIANTS_TEAM_ID` | Reference ID for the Giants (not yet used in filtering) | `137` | Optional | Keep as-is |
 | `LOG_LEVEL` | Python logging level for all pipeline runs | `INFO` | Optional | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `AWS_ACCESS_KEY_ID` | S3 access key ID of an R2 API token. **Secret** | empty | Required with `S3_BUCKET_URL` | From the R2 API token page |
+| `AWS_SECRET_ACCESS_KEY` | S3 secret access key of the same token. **Secret** | empty | Required with `S3_BUCKET_URL` | From the R2 API token page |
+| `S3_BUCKET_URL` | Where dlt writes the raw lake: empty for `<MLB_DATA_DIR>/lake`, or the R2 bucket's S3 API URL, optionally with a folder | empty (local lake) | Optional; required in prod | `https://<account id>.r2.cloudflarestorage.com/mlb-lake/prod` |
+| `IS_PROD` | Must be `true` to write to R2; refused with the local lake | `false` | Optional; `true` in prod | `true` (scheduled prod runs only) |
 | `DBT_OUTPUT_MODE` | dbt schema naming mode: `dev` prefixes schemas with `dbt_<username>_`, `production` uses clean names | `dev` | Optional | `production` (for CI/prod) |
 | `UID` | Linux user ID (for file ownership in `data/`). On macOS, leave as-is | `1000` | macOS: optional; Linux: **highly recommended** | Output of `id -u` on your machine |
 | `GID` | Linux group ID. On macOS, leave as-is | `1000` | macOS: optional; Linux: **highly recommended** | Output of `id -g` on your machine |
@@ -49,6 +53,27 @@ The MLB Stats API ID for the San Francisco Giants (`137`). Kept here for referen
 **`LOG_LEVEL`**
 
 Controls verbosity of pipeline logs. Set to `DEBUG` for detailed diagnostics when troubleshooting.
+
+**`S3_BUCKET_URL`, `IS_PROD`, and the R2 credentials (cloud lake)**
+
+These choose where dlt writes the raw Parquet lake. The pipelines read them through `config.py` (`resolve_lake`), so switching between the local lake and R2 needs no code change.
+
+| `S3_BUCKET_URL` | `IS_PROD` | Result |
+|---|---|---|
+| empty (default) | `false` | Local lake at `<MLB_DATA_DIR>/lake`. Development and CI. |
+| `https://<account id>.r2.cloudflarestorage.com/<bucket>[/<folder>]` | `true` | Cloudflare R2, with `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Production. |
+| set | `false` | Refused (exit code `2`): a dev run never writes the production lake by accident. |
+| empty | `true` | Refused (exit code `2`): a prod run with a missing `S3_BUCKET_URL` would write to a throwaway disk. |
+
+Paste the bucket's **S3 API** URL exactly as Cloudflare shows it (R2 Object Storage → your bucket → Settings), optionally adding a folder such as `/prod`. The pipeline splits it into the endpoint (`https://<account id>.r2.cloudflarestorage.com`) and the bucket path. The account endpoint alone (ending at `.com/`, as shown on the R2 overview and API token pages) is refused, because it names no bucket. Anything other than an `https://` URL is refused too. A missing access key or secret is refused with a message naming the variable.
+
+Every run logs its destination first, for example `Lake destination: remote S3-compatible bucket s3://mlb-lake/prod (endpoint https://<id>.r2.cloudflarestorage.com)` or `Lake destination: local filesystem /data/lake`. Credentials are never logged.
+
+The lake layout is the same everywhere: `raw_statcast/pitches/*.parquet`, `raw_mlb/...`, with `_dlt_loads/` markers and `_dlt_pipeline_state/` next to them, under `<MLB_DATA_DIR>/lake/` or under the bucket folder. The watermark lives in the lake too, so a run on a fresh machine (or a GitHub Actions runner) picks up where the last one left off.
+
+The AWS-style key names are used because R2 speaks the S3 API, and they're the names Cloudflare's token page uses. For R2 setup (bucket, API token, GitHub Actions Secrets), see [`docs/setup.md`](./setup.md#optional-cloud-lake-on-cloudflare-r2).
+
+dbt reads the lake from the same place: with `S3_BUCKET_URL` set, `dbt build` reads the Parquet and load markers straight from the R2 bucket (see "dbt Configuration" below), so the same `.env` drives ingest and `dbt build`. The warehouse file itself stays local, at `<MLB_DATA_DIR>/warehouse/mlb.duckdb`.
 
 **`DBT_OUTPUT_MODE`**
 
@@ -114,7 +139,7 @@ Today, the sources need no API keys:
 - **Baseball Savant** is public (via pybaseball).
 - **MLB Stats API** is public, no authentication required.
 
-So `.dlt/secrets.toml` is empty or absent. When future sources or a warehouse transition require credentials, they would go here, e.g.:
+So `.dlt/secrets.toml` is empty or absent. The cloud lake's R2 credentials don't go here either: they are plain environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, see above) that `config.py` reads and hands to dlt in code, so the same names work in `.env` and in GitHub Actions Secrets. When a future source or warehouse needs credentials, they could go here, e.g.:
 
 ```toml
 [destination.postgres]
@@ -141,11 +166,16 @@ mlb:
       type: duckdb
       path: "{{ env_var('MLB_DATA_DIR', '../data') }}/warehouse/mlb.duckdb"
       threads: 4
+      settings:   # DuckDB's S3 settings, for reading the lake from R2 (abridged)
+        s3_endpoint: <host of S3_BUCKET_URL>   # else s3.amazonaws.com (unused)
+        s3_url_style: path                     # else vhost
+        s3_region: auto                        # else us-east-1
 ```
 
 - **`type: duckdb`:** Use the DuckDB adapter.
 - **`path`:** Location of the DuckDB database file. Reads `MLB_DATA_DIR` from `.env`; defaults to `../data` if not set.
 - **`threads: 4`:** dbt parallelism. Increase on beefy machines, decrease if DuckDB complains about contention.
+- **`settings`:** DuckDB's S3 settings for reading the lake from R2. With `S3_BUCKET_URL` set, the endpoint is that URL's host (`<account id>.r2.cloudflarestorage.com`), with path-style URLs and region `auto`. With it empty they stay at DuckDB's defaults and nothing reads S3. The keys are **not** here: DuckDB reads `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` from the environment itself, so they never appear in dbt's SQL or in `dbt/logs/`. Reading S3 uses DuckDB's `httpfs` extension, which the image installs at build time from the locked `duckdb-extension-httpfs` package (its version must equal `duckdb`'s; a test and the image build both check it), so builds never download it.
 
 **`dbt/dbt_project.yml`** (defines project structure):
 
@@ -161,7 +191,7 @@ Other settings:
 - **`flags: send_anonymous_usage_stats: false`:** no dbt telemetry.
 - **`vars: check_freshness: false`:** the recency tests on completed loads are off by default. Pass `--vars '{check_freshness: true}'` to turn them on (see `docs/usage.md`).
 
-**Sources** (`dbt/models/staging/*/_*__sources.yml`) read the lake directly with DuckDB's `read_parquet`, at `<MLB_DATA_DIR>/lake/<dataset>/<table>/*.parquet`. `stg_dlt__completed_loads` lists `<MLB_DATA_DIR>/lake/*/_dlt_loads/*`. Like `profiles.yml`, they read `MLB_DATA_DIR` (default `../data`, relative to `dbt/`).
+**Sources** (`dbt/models/staging/*/_*__sources.yml`) read the lake directly with DuckDB's `read_parquet`, at `<lake root>/<dataset>/<table>/*.parquet`. `stg_dlt__completed_loads` lists `<lake root>/*/_dlt_loads/*`. The lake root follows the same rule as the pipelines: `s3://<bucket>[/<folder>]` from `S3_BUCKET_URL` when it's set, else `<MLB_DATA_DIR>/lake` (`MLB_DATA_DIR` defaults to `../data`, relative to `dbt/`). The rule lives in `dbt/macros/lake_root.sql`; the source YAML repeats it inline because dbt doesn't let source YAML call macros, and a test checks the copies match.
 
 ---
 
@@ -178,6 +208,10 @@ LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "4"))
 MAX_CATCHUP_DAYS = int(os.getenv("MAX_CATCHUP_DAYS", "30"))
 GIANTS_TEAM_ID = int(os.getenv("GIANTS_TEAM_ID", "137"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
+S3_BUCKET_URL = os.getenv("S3_BUCKET_URL", "").strip()
+IS_PROD = os.getenv("IS_PROD", "false").strip().lower() in {"1", "true", "yes"}
 ```
 
 Each has the default shown, so an unset variable falls back to it. `config.py` also defines fixed (non-env) settings:
@@ -185,6 +219,7 @@ Each has the default shown, so an unset variable falls back to it. `config.py` a
 - **`SCHEMA_EXPORT_DIR`:** `schemas/export/` in the repo. dlt schemas are exported here after every run and committed.
 - **`SEASON_START` / `SEASON_END`:** February 15 and November 15. Days outside this range are skipped without calling the source.
 - The load-window and watermark rules (`choose_window`, `next_watermark`), described in `docs/usage.md`.
+- The lake destination rules (`resolve_lake`, `lake_from_env`), described under `S3_BUCKET_URL` above.
 
 The Statcast pipeline also has fixed politeness settings at the top of `src/mlb/pipelines/statcast.py`: 3 attempts per day, backoff starting at 5 seconds, and 2 seconds between days.
 
@@ -212,7 +247,7 @@ environment:
 The `dbt` service's entrypoint runs `mkdir -p "$MLB_DATA_DIR/warehouse"` and then `dbt` with your arguments (`build` when none are given). DuckDB won't create a missing folder for its database file, and `data/warehouse` is meant to be deletable.
 - **`TZ: America/Los_Angeles`:** For consistency (MLB games are in various US timezones, but most operations treat times as Pacific). Override if needed.
 
-You can add more variables to `.env` and they'll be picked up by `docker-compose.yml` automatically.
+Every other setting, including the lake destination (`AWS_*`, `S3_BUCKET_URL`, `IS_PROD`), reaches the containers only through `env_file: .env`: every variable in `.env` is passed in, so a new variable needs no change to `docker-compose.yml`. `.env.example` is the list of every variable, and this document must match it. A variable exported in your shell but missing from `.env` does **not** reach the container; put it in `.env` (CI generates its `.env` from `.env.example`, and the scheduled workflow will append its secrets there).
 
 ### The `reports` service
 
@@ -261,6 +296,26 @@ LOOKBACK_DAYS=four
 # Good:
 LOOKBACK_DAYS=4
 ```
+
+### "S3_BUCKET_URL=... is set, but IS_PROD is not true"
+
+The pipeline refused to write to the cloud lake from a non-production run. For development, leave `S3_BUCKET_URL` empty. For a deliberate production run, set `IS_PROD=true`.
+
+### "IS_PROD=true needs S3_BUCKET_URL"
+
+`IS_PROD` is on, but `S3_BUCKET_URL` is empty. In GitHub Actions this usually means the secret or variable holding it isn't set.
+
+### "S3_BUCKET_URL=https://... names no bucket"
+
+`S3_BUCKET_URL` holds the account endpoint (`https://<account id>.r2.cloudflarestorage.com/`), which Cloudflare shows on the R2 overview and API token pages. Use the bucket's **S3 API** URL instead (R2 Object Storage → your bucket → Settings), which ends in the bucket name.
+
+### "S3_BUCKET_URL=... is not a bucket URL"
+
+The value isn't an `https://` URL. Older forms (`s3://...`, `file://...`) and the old `BUCKET_URL` / `R2_ACCOUNT_ID` variables are no longer read: paste the bucket's S3 API URL into `S3_BUCKET_URL`.
+
+### "S3_BUCKET_URL=... needs AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
+
+Set both keys (from the R2 API token) in `.env` or the environment.
 
 ### dbt can't find the warehouse
 

@@ -5,3 +5,11 @@ mlb:
       type: duckdb
       path: "{{ env_var('MLB_DATA_DIR', '../data') }}/warehouse/mlb.duckdb"
       threads: 4
+      # Reading the lake from R2 when S3_BUCKET_URL is set (DuckDB's httpfs, installed in the
+      # image). Only non-secret settings here: DuckDB reads AWS_ACCESS_KEY_ID and
+      # AWS_SECRET_ACCESS_KEY from the environment itself, so the keys never appear in dbt's
+      # SQL or logs. With S3_BUCKET_URL empty these stay at DuckDB's defaults and go unused.
+      settings:
+        s3_endpoint: "{{ env_var('S3_BUCKET_URL').split('/')[2] if env_var('S3_BUCKET_URL', '') | trim else 's3.amazonaws.com' }}"
+        s3_url_style: "{{ 'path' if env_var('S3_BUCKET_URL', '') | trim else 'vhost' }}"
+        s3_region: "{{ 'auto' if env_var('S3_BUCKET_URL', '') | trim else 'us-east-1' }}"

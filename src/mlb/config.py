@@ -3,9 +3,10 @@
 import logging
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,14 @@ LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "4"))
 MAX_CATCHUP_DAYS = int(os.getenv("MAX_CATCHUP_DAYS", "30"))
 GIANTS_TEAM_ID = int(os.getenv("GIANTS_TEAM_ID", "137"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+# Lake destination (docs/roadmap/phase-2-cloud-and-scale.md, P2M1), in the order Cloudflare
+# shows them. An empty S3_BUCKET_URL means the local lake under MLB_DATA_DIR; the bucket's
+# R2 S3 API URL means the cloud lake, which needs IS_PROD=true.
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
+S3_BUCKET_URL = os.getenv("S3_BUCKET_URL", "").strip()
+IS_PROD = os.getenv("IS_PROD", "false").strip().lower() in {"1", "true", "yes"}
 
 # Data subdirectories
 LAKE_DIR = MLB_DATA_DIR / "lake"
@@ -65,6 +74,105 @@ def log_config() -> None:
     logger.info(f"LOOKBACK_DAYS: {LOOKBACK_DAYS}")
     logger.info(f"MAX_CATCHUP_DAYS: {MAX_CATCHUP_DAYS}")
     logger.info(f"GIANTS_TEAM_ID: {GIANTS_TEAM_ID}")
+    logger.info(f"IS_PROD: {IS_PROD}")
+
+
+# --- Lake destination (docs/roadmap/phase-2-cloud-and-scale.md, P2M1) --------
+
+
+class LakeConfigError(ValueError):
+    """S3_BUCKET_URL, IS_PROD, and the credentials don't describe a usable lake."""
+
+
+@dataclass(frozen=True)
+class Lake:
+    """Where dlt writes the lake: a local folder, or an S3-compatible bucket (R2)."""
+
+    bucket_url: str
+    remote: bool
+    endpoint_url: str | None = None
+    access_key_id: str = field(default="", repr=False)
+    secret_access_key: str = field(default="", repr=False)
+
+    def describe(self) -> str:
+        """A log line naming the destination, without credentials."""
+        if not self.remote:
+            return f"local filesystem {self.bucket_url}"
+        return f"remote S3-compatible bucket {self.bucket_url} (endpoint {self.endpoint_url})"
+
+
+def resolve_lake(
+    data_dir: Path,
+    s3_bucket_url: str,
+    is_prod: bool,
+    access_key_id: str = "",
+    secret_access_key: str = "",
+) -> Lake:
+    """Turn the lake settings into a Lake, failing loudly on a risky or incomplete setup.
+
+    An empty s3_bucket_url is the local lake, data_dir/lake. Otherwise it is the bucket's
+    S3 API URL as Cloudflare shows it, https://<account id>.r2.cloudflarestorage.com/
+    <bucket>, optionally with a folder after the bucket. A remote lake needs is_prod (so a
+    dev run never writes the production lake by accident) and both credentials. is_prod
+    with a local lake is refused too, so a prod run with a missing S3_BUCKET_URL can't
+    quietly write to a throwaway disk.
+    """
+    if not s3_bucket_url:
+        if is_prod:
+            raise LakeConfigError(
+                "IS_PROD=true needs S3_BUCKET_URL (the bucket's S3 API URL); "
+                f"refusing to write the production lake to {data_dir / 'lake'}"
+            )
+        return Lake(str(data_dir / "lake"), remote=False)
+    bucket_url, endpoint_url = _split_s3_bucket_url(s3_bucket_url)
+    if not is_prod:
+        raise LakeConfigError(
+            f"S3_BUCKET_URL={s3_bucket_url} is set, but IS_PROD is not true. Set IS_PROD=true "
+            "to write the production lake, or leave S3_BUCKET_URL empty for the local lake."
+        )
+    missing = [
+        name
+        for name, value in [
+            ("AWS_ACCESS_KEY_ID", access_key_id),
+            ("AWS_SECRET_ACCESS_KEY", secret_access_key),
+        ]
+        if not value
+    ]
+    if missing:
+        raise LakeConfigError(f"S3_BUCKET_URL={s3_bucket_url} needs {' and '.join(missing)}")
+    return Lake(
+        bucket_url,
+        remote=True,
+        endpoint_url=endpoint_url,
+        access_key_id=access_key_id,
+        secret_access_key=secret_access_key,
+    )
+
+
+def _split_s3_bucket_url(url: str) -> tuple[str, str]:
+    """Split https://<host>/<bucket>[/<folder>] into (s3://<bucket>[/<folder>], https://<host>).
+
+    The URL must name a bucket: the account endpoint alone (https://<host>/) says where R2
+    is, not where the lake goes.
+    """
+    parts = urlsplit(url)
+    if parts.scheme != "https" or not parts.netloc:
+        raise LakeConfigError(
+            f"S3_BUCKET_URL={url!r} is not a bucket URL. Leave it empty for the local lake, or "
+            "use the bucket's S3 API URL: https://<account id>.r2.cloudflarestorage.com/<bucket>"
+        )
+    path = parts.path.strip("/")
+    if not path:
+        raise LakeConfigError(
+            f"S3_BUCKET_URL={url} names no bucket. Use the bucket's S3 API URL from its Settings "
+            f"page ({url.rstrip('/')}/<bucket>), optionally with a folder: .../<bucket>/prod"
+        )
+    return f"s3://{path}", f"https://{parts.netloc}"
+
+
+def lake_from_env(data_dir: Path) -> Lake:
+    """The Lake described by S3_BUCKET_URL, IS_PROD, and the credential env vars."""
+    return resolve_lake(data_dir, S3_BUCKET_URL, IS_PROD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
 
 
 def yesterday(today: date | None = None) -> date:

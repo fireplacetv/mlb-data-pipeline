@@ -275,9 +275,11 @@ def mlb_api_source(rest_api_config: RESTAPIConfig) -> list[DltResource]:
 # --- Running --------------------------------------------------------------------
 
 
-def build_pipeline(data_dir: Path, schema_dir: Path) -> dlt.Pipeline:
-    """Create the mlb_api dlt pipeline writing Parquet under data_dir/lake."""
-    return common.build_pipeline(PIPELINE_NAME, DATASET_NAME, data_dir, schema_dir)
+def build_pipeline(
+    data_dir: Path, schema_dir: Path, lake: config.Lake | None = None
+) -> dlt.Pipeline:
+    """Create the mlb_api dlt pipeline writing Parquet to the lake."""
+    return common.build_pipeline(PIPELINE_NAME, DATASET_NAME, data_dir, schema_dir, lake)
 
 
 def stored_watermark(pipeline: dlt.Pipeline) -> date | None:
@@ -348,12 +350,17 @@ def run(
     data_dir: Path = config.MLB_DATA_DIR,
     schema_dir: Path = config.SCHEMA_EXPORT_DIR,
     today: date | None = None,
+    lake: config.Lake | None = None,
     session: requests.Session | None = None,
     sleep: Sleep = time.sleep,
 ) -> int:
     """Load the chosen window into the lake. Returns the process exit code."""
     run_started = time.monotonic()
-    pipeline = build_pipeline(data_dir, schema_dir)
+    try:
+        pipeline = build_pipeline(data_dir, schema_dir, lake)
+    except config.LakeConfigError as exc:
+        logger.error("%s", exc)
+        return 2
     loaded_through = restore_watermark(pipeline)
     logger.info("Watermark (loaded_through): %s", loaded_through or "none")
 
