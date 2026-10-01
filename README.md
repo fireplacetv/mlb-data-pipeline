@@ -91,6 +91,7 @@ See [`docs/usage.md`](./docs/usage.md) for full details on each command.
 | Build the image | `docker compose build` |
 | Ingest Statcast (catch up since last load) | `docker compose run --rm pipeline python -m mlb.pipelines.statcast` |
 | Ingest Statcast (backfill a date range) | `docker compose run --rm pipeline python -m mlb.pipelines.statcast --start YYYY-MM-DD --end YYYY-MM-DD` |
+| Ingest Statcast (one automatic backfill chunk) | `docker compose run --rm pipeline python -m mlb.pipelines.statcast --chunk-days` |
 | Ingest MLB Stats API | `docker compose run --rm pipeline python -m mlb.pipelines.mlb_api` (same flags) |
 | Build and test staging | `docker compose run --rm dbt build` |
 | Rebuild from scratch | `docker compose run --rm dbt build --full-refresh` |
@@ -110,7 +111,7 @@ See [`docs/usage.md`](./docs/usage.md) for full details on each command.
 ## Documentation
 
 - **[`docs/setup.md`](./docs/setup.md):** Environment setup, first run, troubleshooting.
-- **[`docs/usage.md`](./docs/usage.md):** Detailed command reference, including what CI (`.github/workflows/ci.yml`) runs on PRs and merges to `main`, and the daily production run (`.github/workflows/scheduled-ingest.yml`).
+- **[`docs/usage.md`](./docs/usage.md):** Detailed command reference, including what CI (`.github/workflows/ci.yml`) runs on PRs and merges to `main`, the daily production run (`.github/workflows/scheduled-ingest.yml`), and the automatic historical backfill (`.github/workflows/backfill.yml`).
 - **[`docs/configuration.md`](./docs/configuration.md):** Every environment variable and config option.
 - **[`docs/roadmap/`](./docs/roadmap/):** Design docs for future development phases.
 - **[`ARCHITECTURE.md`](./ARCHITECTURE.md):** Full design spec, data sources, extract/load, staging, warehouse, Docker setup.

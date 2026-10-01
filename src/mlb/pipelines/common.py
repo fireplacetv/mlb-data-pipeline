@@ -12,6 +12,10 @@ from mlb import config
 logger = logging.getLogger(__name__)
 
 WATERMARK_KEY = "loaded_through"
+# Backfill progress is tracked separately from the catch-up watermark (never reused: the
+# watermark never moves backward, so a disconnected backfill into history could never
+# advance it; see config.next_backfill_window and ARCHITECTURE.md §6.6).
+BACKFILL_MARK_KEY = "backfilled_through"
 
 
 def lake_destination(lake: config.Lake) -> dlt.destinations.filesystem:
@@ -56,16 +60,20 @@ def source_state(pipeline: dlt.Pipeline, source_name: str) -> dict:
     return pipeline.state.get("sources", {}).get(source_name, {})
 
 
-def stored_watermark(pipeline: dlt.Pipeline, source_name: str) -> date | None:
-    """Return the watermark from the pipeline's local state."""
-    value = source_state(pipeline, source_name).get(WATERMARK_KEY)
+def stored_watermark(
+    pipeline: dlt.Pipeline, source_name: str, key: str = WATERMARK_KEY
+) -> date | None:
+    """Return the mark at key (the catch-up watermark by default) from local state."""
+    value = source_state(pipeline, source_name).get(key)
     return date.fromisoformat(value) if value else None
 
 
-def restore_watermark(pipeline: dlt.Pipeline, source_name: str) -> date | None:
-    """Sync state from the lake (restores a deleted pipelines dir), then read the watermark."""
+def restore_watermark(
+    pipeline: dlt.Pipeline, source_name: str, key: str = WATERMARK_KEY
+) -> date | None:
+    """Sync state from the lake (restores a deleted pipelines dir), then read the mark at key."""
     pipeline.sync_destination()
-    return stored_watermark(pipeline, source_name)
+    return stored_watermark(pipeline, source_name, key)
 
 
 def table_columns(pipeline: dlt.Pipeline) -> dict[str, set[str]]:

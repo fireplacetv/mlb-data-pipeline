@@ -44,6 +44,7 @@ docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2024-0
 - `--start YYYY-MM-DD`: First date to pull (inclusive).
 - `--end YYYY-MM-DD`: Last date to pull (inclusive). Must be yesterday or earlier.
 - Give both flags or neither. With neither, the pipeline catches up from the watermark. See "Watermarks and Incremental Loading" below.
+- `--chunk-days [N]`: automatic backfill instead of catch-up — loads `N` days (or `BACKFILL_CHUNK_DAYS` if `N` is omitted) from `backfilled_through`, then stops. Can't be combined with `--start`/`--end`. See "Automatic Backfill" below.
 
 **What a run does:**
 - Pulls one day at a time with `pybaseball.statcast()`, sleeping 2 seconds between days and retrying a failed day up to 3 times with backoff (5s, then 10s).
@@ -77,7 +78,7 @@ Backfill a specific date range:
 docker compose run --rm pipeline python -m mlb.pipelines.mlb_api --start 2024-06-01 --end 2024-09-30
 ```
 
-**Flags:** the same as Statcast: `--start` and `--end` together for a backfill, neither for a catch-up. The watermark is separate from Statcast's.
+**Flags:** the same as Statcast: `--start` and `--end` together for a backfill, neither for a catch-up, or `--chunk-days [N]` for an automatic backfill (see "Automatic Backfill" below). The watermark and the `backfilled_through` mark are both separate from Statcast's.
 
 **What a run does:** several dlt loads, in this order:
 
@@ -126,7 +127,7 @@ Each pipeline tracks a `loaded_through` date in dlt's source state. When you run
 
 **Manual backfill:** Use `--start` and `--end` to load any date range explicitly. A backfill moves the watermark to its end date only if every day succeeded **and** it connects to the watermark: it starts on or before `loaded_through + 1`, or no watermark exists yet (so a first backfill sets it). A disconnected backfill (starting after `loaded_through + 1`) still lands its data but leaves the watermark unchanged.
 
-**Where the watermark lives:** in dlt source state, saved with each load and synced to the lake (`data/lake/raw_statcast/_dlt_pipeline_state/`, or `data/lake/raw_mlb/_dlt_pipeline_state/` for `mlb_api`, which also keeps its fetched player IDs there as `people_fetched`). `data/dlt_pipelines/` is only a local working copy: deleting it is safe, and the next run restores the watermark from the lake.
+**Where the watermark lives:** in dlt source state, saved with each load and synced to the lake (`data/lake/raw_statcast/_dlt_pipeline_state/`, or `data/lake/raw_mlb/_dlt_pipeline_state/` for `mlb_api`, which also keeps its fetched player IDs there as `people_fetched`). `data/dlt_pipelines/` is only a local working copy: deleting it is safe, and the next run restores the watermark from the lake. An automatic `--chunk-days` backfill's progress lives alongside it in the same state, under a separate key, `backfilled_through` — see "Automatic Backfill" below for why it isn't `loaded_through` itself.
 
 **Printing the watermark:** every run logs it (`Watermark (loaded_through): ...`). To check without running:
 
@@ -364,6 +365,35 @@ The `scheduled-ingest` concurrency group keeps runs from overlapping: a manual d
 
 ---
 
+## Automatic Backfill
+
+`.github/workflows/backfill.yml` steadily backfills history (`BACKFILL_START`, default `2015-04-01`, through yesterday) into the R2 lake on its own daily schedule, with no manual intervention (`docs/roadmap/phase-2-cloud-and-scale.md`, P2M4) — the automated version of the "full historical ingest" chunking in "Common Workflows" below.
+
+**Why this needs its own flag and its own mark, not just a long `--start`/`--end` run left to a timeout:**
+- **Statcast** does the whole requested window as one dlt load; the watermark is only written after every day in it has been attempted. If GitHub killed a multi-month run at the timeout, nothing would be committed — no data (no completed-load marker, so staging ignores anything that landed) and no watermark — so the next firing would restart from scratch, forever re-downloading the same days from Savant.
+- **MLB Stats API** does commit each day's data as it goes, but the watermark only advances in the final `people` step, after the whole window's days, snapshots, and people load have finished. A kill partway through would leave `loaded_through` unmoved, so the next firing would re-request the same days again — wasteful, and no faster than a short run.
+- Sizing each firing to one bounded chunk sidesteps both problems: the chunk finishes and commits normally, well inside the workflow's timeout, so every firing is a real, permanent step forward.
+
+**`--chunk-days [N]`** runs this instead of a catch-up or a manual backfill: it loads `N` days (or `BACKFILL_CHUNK_DAYS`, default 30, if `N` is omitted) starting the day after `backfilled_through`, or from `BACKFILL_START` if that mark doesn't exist yet, then stops. It can't be combined with `--start`/`--end`.
+
+**Why `backfilled_through` is a separate mark, not `loaded_through`:** the watermark never moves backward (see "Watermarks and Incremental Loading" above) — that's what makes a disconnected backfill safe. But it also means that once the daily catch-up has run even once, `loaded_through` sits at yesterday, and a backfill chunk into history is permanently "disconnected" from it: `next_watermark` would correctly refuse to move `loaded_through` backward in time, and a backfill tracked through that key would never make visible progress again. Tracking backfill progress through its own `backfilled_through` key (next to `people_fetched`'s precedent in `mlb_api`'s state) lets `backfill.yml` and `scheduled-ingest.yml` run independently, on their own schedules, without either resetting the other's progress. Chunks are always contiguous (each starts the day after the last one ended, including across the off-season), which is what keeps `next_watermark`'s connectedness check passing and `backfilled_through` advancing every chunk that fully succeeds.
+
+**If a day inside a chunk fails:** the whole chunk's `backfilled_through` mark holds at its prior value (the same "don't move on any failure" rule a manual backfill follows), the run exits `1`, and the next firing — scheduled or manual — retries the exact same chunk. No manual `--start`/`--end` re-run is needed.
+
+**Once the backfill reaches yesterday:** a firing logs `Backfill complete: reached yesterday (...); nothing to do.` and exits `0` having loaded nothing. The schedule keeps firing daily after that, but every run is a fast no-op — there is currently no step that disables the schedule once it's done; see "Open Questions" in the Phase 2 roadmap doc.
+
+**Concurrency:** `backfill.yml` shares `scheduled-ingest`'s concurrency group — both write the same R2 lake and dlt pipeline state, which assumes a single writer. A long chunk can push that day's catch-up out of the queue; the next day's catch-up self-heals via `LOOKBACK_DAYS`. It does not run `dbt build` or upload the warehouse: `scheduled-ingest.yml` already rebuilds the warehouse from the lake daily, so repeating that on every chunk would be pure waste and would hold the shared slot longer.
+
+**Tuning the pace:** the recurring daily schedule always uses `BACKFILL_CHUNK_DAYS` (`docs/configuration.md`, default 30), changed by editing that default in `.env.example` and committing — there's no repository variable for it, since the schedule has no per-run inputs. For a one-off run instead, a manual trigger's `chunk_days` input overrides it for that run only, with no commit needed (see "Manual trigger" below). Smaller chunks make slower overall progress but a smaller blast radius per firing; larger chunks finish the backfill sooner but hold the shared concurrency slot longer per run.
+
+**One-time repository setup:** none beyond `scheduled-ingest.yml`'s — the same `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `S3_BUCKET_URL` repository secrets/variable are reused.
+
+**Manual trigger:** run the workflow from the GitHub UI (Actions → Automatic backfill → Run workflow), optionally with a `chunk_days` input to load a different number of days than `BACKFILL_CHUNK_DAYS` for that one run — for example a larger number to speed through a backfill faster than one default-sized chunk a day. Leave it empty to use the default.
+
+**Checking it ran:** the Actions tab lists each run; open one for per-step logs, or download the `backfill-logs` artifact for the same `data/logs/` files a local run would produce.
+
+---
+
 ## Inspecting Data
 
 ### Query the warehouse
@@ -411,6 +441,8 @@ See "Watermarks and Incremental Loading" above for resetting it.
 ## Common Workflows
 
 ### A full historical ingest (first time)
+
+In production, `.github/workflows/backfill.yml` does this by itself, a chunk at a time, with no manual intervention — see "Automatic Backfill" above. The steps below are for a manual, local, or one-off run.
 
 1. Build the image: `docker compose build`
 2. Ingest Statcast: `docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2015-04-01 --end <yesterday>`

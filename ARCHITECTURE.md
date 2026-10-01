@@ -274,6 +274,8 @@ The watermark never moves backward: a failure inside the lookback days, or a bac
 
 Defaults: `LOOKBACK_DAYS=4` (Savant revises recent games) and `MAX_CATCHUP_DAYS=30` (bigger gaps are deliberate backfills). Both are env vars.
 
+**Automatic backfill (`--chunk-days`, Phase 2 P2M4).** The watermark's never-moves-backward rule, which is what makes a disconnected manual backfill safe, also means it can't track backfill progress: once a day's catch-up has run, `loaded_through` sits at yesterday, and any backfill chunk into older history is permanently "disconnected" from it — `next_watermark` correctly refuses to move it, so a backfill tracked through `loaded_through` would never advance after the first catch-up run. `--chunk-days [N]` instead tracks its own mark, `backfilled_through`, in the same source state (alongside `people_fetched`'s precedent in `mlb_api`): it loads `N` days (`BACKFILL_CHUNK_DAYS` if `N` is omitted) starting the day after `backfilled_through`, or from `BACKFILL_START` if that mark doesn't exist yet, reusing `next_watermark`'s same connected/failed-day rules against that key instead of `loaded_through`. Chunks are built contiguous (`config.next_backfill_window`) — each starts the day after the previous one ended, including across the off-season — which is exactly what keeps the connectedness check passing on every firing. A day that fails holds `backfilled_through` at its prior value, so the next firing retries the same chunk; reaching yesterday returns no window at all, and the caller logs completion and loads nothing. This lets `.github/workflows/backfill.yml` make steady, unattended progress on its own schedule without the daily catch-up (`scheduled-ingest.yml`) resetting it, and without either job's run depending on the other's — see `docs/usage.md` ("Automatic Backfill") for why sizing each firing to one bounded, committing chunk also sidesteps a longer-standing problem: a GitHub Actions timeout killing one huge `pipeline.run()` mid-backfill commits nothing for Statcast (one dlt load for the whole window) and doesn't advance `mlb_api`'s watermark either (it's set only in the final `people` step), so either pipeline would silently restart from scratch on every firing if sized that way.
+
 **Why not dlt's cursor-based `dlt.sources.incremental`:** it filters out rows at or below the last cursor value it saw. The lookback re-pull exists precisely to reload those rows so revised data lands, and staging already deduplicates by latest load. A stored date watermark gives catch-up without dropping revisions.
 
 **Per resource:**
@@ -631,7 +633,7 @@ Complete in order. Each milestone ends with its checks passing. All commands run
 - **Done when:** `docker compose run --rm dbt build` passes all tests. The duplicate loads from M1 collapse to one row per pitch, and rows from a load without a marker are excluded. Deleting `data/warehouse` and re-running `dbt build` gives identical row counts. Any DuckDB-specific SQL carries the one-line comment required by §8.
 
 ### M4 — Operate
-- A historical backfill (2015 → present) run in season-sized chunks that can resume after failure.
+- A historical backfill (2015 → present) run in season-sized chunks that can resume after failure (by hand; automated later in Phase 2 P2M4).
 - CI workflow with the fixture lake (§9).
 - Docs: the update-by-hand section of `docs/usage.md` and the troubleshooting section of `docs/setup.md` are complete, and the two initial phase docs (§9.1) exist at `proposed`.
 - **Done when:** running the ingest commands and `dbt build` by hand succeeds end to end for yesterday, full history is in the lake, deleting `data/warehouse` and running `dbt build` rebuilds it, and CI is green on a PR. Someone new to the repo can follow `docs/setup.md` from a clean machine to a successful `dbt build` without asking questions.
@@ -663,7 +665,7 @@ These items are grouped into development phases, each with a design doc in `docs
 - **Cloud lake:** dlt destination to Cloudflare R2 for production (local filesystem preserved for CI).
 - **Scheduled runs:** GitHub Actions for daily automated ingests.
 - **Secrets management:** GitHub Actions Secrets for R2 credentials.
-- **Milestones:** P2M1 (dlt → R2 + local flexibility), P2M2 (GitHub Actions scheduled daily runs), P2M3 (Delta Lake, deferred).
+- **Milestones:** P2M1 (dlt → R2 + local flexibility), P2M2 (GitHub Actions scheduled daily runs), P2M3 (Delta Lake, deferred), P2M4 (automatic historical backfill).
 
 **Phase 1 — Modeling Layer** (on hold, independent of Phase 2):
 - **Intermediate models:** events, games with derived status, seasons with aggregated stats.

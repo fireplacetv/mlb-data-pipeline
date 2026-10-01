@@ -11,6 +11,8 @@ Every variable in this table is documented in `.env.example`. Copy that file, ed
 | `MLB_DATA_DIR` | Root directory for all pipeline data: lake, warehouse, logs, caches | `./data` | Required | `/tmp/mlb_data` or `~/mlb_data` |
 | `LOOKBACK_DAYS` | Days to re-pull on every catch-up run, to pick up Savant revisions | `4` | Optional | `7` (larger = more careful, slower) |
 | `MAX_CATCHUP_DAYS` | Refuse to run catch-up if this many days have elapsed; ask for explicit backfill instead | `30` | Optional | `14` or `60` |
+| `BACKFILL_START` | First day an automatic `--chunk-days` backfill loads, if `backfilled_through` has no mark yet | `2015-04-01` | Optional | `2008-04-01` |
+| `BACKFILL_CHUNK_DAYS` | Days per automatic backfill firing, when `--chunk-days` is given with no explicit `N` | `30` | Optional | `10` (slower, smaller blast radius) |
 | `GIANTS_TEAM_ID` | Reference ID for the Giants (not yet used in filtering) | `137` | Optional | Keep as-is |
 | `LOG_LEVEL` | Python logging level for all pipeline runs | `INFO` | Optional | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
 | `AWS_ACCESS_KEY_ID` | S3 access key ID of an R2 API token. **Secret** | empty | Required with `S3_BUCKET_URL` | From the R2 API token page |
@@ -46,6 +48,10 @@ If more than this many days have passed since the last load, the pipeline refuse
 
 Default 30 is reasonable. Increase it if you expect long gaps between runs (e.g., off-season).
 
+**`BACKFILL_START` and `BACKFILL_CHUNK_DAYS`**
+
+Control an automatic `--chunk-days` backfill (`docs/usage.md#automatic-backfill`, `.github/workflows/backfill.yml`), which is separate from catch-up: `BACKFILL_START` is where history starts if the backfill's own `backfilled_through` mark hasn't been set yet, and `BACKFILL_CHUNK_DAYS` is how many days `--chunk-days` loads per firing when given with no explicit `N`. Neither affects `--start`/`--end` or catch-up, which still use `loaded_through`.
+
 **`GIANTS_TEAM_ID`**
 
 The MLB Stats API ID for the San Francisco Giants (`137`). Kept here for reference; not yet used in filtering, but available for future features.
@@ -75,7 +81,7 @@ The AWS-style key names are used because R2 speaks the S3 API, and they're the n
 
 **GitHub Actions Secrets and Variables (scheduled production runs)**
 
-`.github/workflows/scheduled-ingest.yml` (`docs/usage.md#scheduled-runs-and-github-actions`) is the only workflow that writes to R2; `ci.yml` always uses the local lake. It builds its own `.env` from repository settings under **Settings → Secrets and variables → Actions**:
+`.github/workflows/scheduled-ingest.yml` (`docs/usage.md#scheduled-runs-and-github-actions`) and `.github/workflows/backfill.yml` (`docs/usage.md#automatic-backfill`) are the only workflows that write to R2; `ci.yml` always uses the local lake. Both build their own `.env` from repository settings under **Settings → Secrets and variables → Actions**, the same way:
 
 | Name | Kind | Maps to | Why not the other kind |
 |---|---|---|---|
@@ -212,6 +218,7 @@ Other settings:
 At runtime, the pipeline loads configuration from `config.py`:
 
 ```python
+from datetime import date
 from pathlib import Path
 import os
 
@@ -220,6 +227,8 @@ LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "4"))
 MAX_CATCHUP_DAYS = int(os.getenv("MAX_CATCHUP_DAYS", "30"))
 GIANTS_TEAM_ID = int(os.getenv("GIANTS_TEAM_ID", "137"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+BACKFILL_START = date.fromisoformat(os.getenv("BACKFILL_START", "2015-04-01"))
+BACKFILL_CHUNK_DAYS = int(os.getenv("BACKFILL_CHUNK_DAYS", "30"))
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
 S3_BUCKET_URL = os.getenv("S3_BUCKET_URL", "").strip()

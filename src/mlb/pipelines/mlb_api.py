@@ -1,6 +1,6 @@
 """MLB Stats API pipeline: schedule, boxscores, snapshots -> Parquet lake (ARCHITECTURE.md §6.4).
 
-Run: python -m mlb.pipelines.mlb_api [--start YYYY-MM-DD --end YYYY-MM-DD]
+Run: python -m mlb.pipelines.mlb_api [--start YYYY-MM-DD --end YYYY-MM-DD | --chunk-days N]
 
 A run is several dlt loads, one per step, all under the `mlb_api` source:
 1. One load per in-season day: `schedule` and the boxscores of that day's Final games.
@@ -216,11 +216,17 @@ def snapshot_config(
 
 def new_person_ids(
     player_ids: set[int],
-    loaded_through: date | None,
+    prior_mark: date | None,
+    mark_key: str,
     window: config.LoadWindow,
     failed_days: list[date],
 ) -> DltResource:
-    """Batches of player ids not fetched before. Also saves the watermark with this load."""
+    """Batches of player ids not fetched before. Also saves the mark at mark_key with this load.
+
+    mark_key is common.WATERMARK_KEY for a catch-up/manual backfill, or
+    common.BACKFILL_MARK_KEY for an automatic --chunk-days backfill, tracked separately
+    since the two never share progress.
+    """
 
     @dlt.resource(name="new_person_ids", selected=False)
     def batches() -> Iterator[list[Row]]:
@@ -233,9 +239,9 @@ def new_person_ids(
             yield [{"person_ids": ",".join(str(i) for i in chunk)}]
         # Saved with this load, so neither moves until the data has landed (§6.6).
         state[PEOPLE_FETCHED_KEY] = sorted(fetched | set(new_ids))
-        new_mark = config.next_watermark(loaded_through, window, failed_days)
+        new_mark = config.next_watermark(prior_mark, window, failed_days)
         if new_mark is not None:
-            state[common.WATERMARK_KEY] = new_mark.isoformat()
+            state[mark_key] = new_mark.isoformat()
 
     return batches
 
@@ -290,6 +296,16 @@ def stored_watermark(pipeline: dlt.Pipeline) -> date | None:
 def restore_watermark(pipeline: dlt.Pipeline) -> date | None:
     """Sync state from the lake (restores a deleted pipelines dir), then read the watermark."""
     return common.restore_watermark(pipeline, SOURCE_NAME)
+
+
+def stored_backfill_mark(pipeline: dlt.Pipeline) -> date | None:
+    """Return the automatic backfill's progress mark from the pipeline's local state."""
+    return common.stored_watermark(pipeline, SOURCE_NAME, common.BACKFILL_MARK_KEY)
+
+
+def restore_backfill_mark(pipeline: dlt.Pipeline) -> date | None:
+    """Sync state from the lake, then read the automatic backfill's progress mark."""
+    return common.restore_watermark(pipeline, SOURCE_NAME, common.BACKFILL_MARK_KEY)
 
 
 def run_step(
@@ -347,6 +363,7 @@ def run(
     start: date | None = None,
     end: date | None = None,
     *,
+    chunk_days: int | None = None,
     data_dir: Path = config.MLB_DATA_DIR,
     schema_dir: Path = config.SCHEMA_EXPORT_DIR,
     today: date | None = None,
@@ -354,21 +371,41 @@ def run(
     session: requests.Session | None = None,
     sleep: Sleep = time.sleep,
 ) -> int:
-    """Load the chosen window into the lake. Returns the process exit code."""
+    """Load the chosen window into the lake. Returns the process exit code.
+
+    chunk_days runs an automatic backfill instead of a catch-up/manual backfill: it loads
+    chunk_days days starting after the separately-tracked backfilled_through mark (or
+    config.BACKFILL_START on the first run), then stops. Returns 0 with nothing loaded once
+    the backfill reaches yesterday.
+    """
     run_started = time.monotonic()
     try:
         pipeline = build_pipeline(data_dir, schema_dir, lake)
     except config.LakeConfigError as exc:
         logger.error("%s", exc)
         return 2
-    loaded_through = restore_watermark(pipeline)
-    logger.info("Watermark (loaded_through): %s", loaded_through or "none")
+    yesterday_ = config.yesterday(today)
 
-    try:
-        window = config.choose_window(loaded_through, config.yesterday(today), start, end)
-    except (config.CatchupGapError, ValueError) as exc:
-        logger.error("%s", exc)
-        return 2
+    if chunk_days is not None:
+        mark_key = common.BACKFILL_MARK_KEY
+        prior_mark = restore_backfill_mark(pipeline)
+        logger.info("Backfill progress (backfilled_through): %s", prior_mark or "none")
+        window = config.next_backfill_window(
+            prior_mark, config.BACKFILL_START, yesterday_, chunk_days
+        )
+        if window is None:
+            logger.info("Backfill complete: reached yesterday (%s); nothing to do.", yesterday_)
+            return 0
+    else:
+        mark_key = common.WATERMARK_KEY
+        prior_mark = restore_watermark(pipeline)
+        logger.info("Watermark (loaded_through): %s", prior_mark or "none")
+        try:
+            window = config.choose_window(prior_mark, yesterday_, start, end)
+        except (config.CatchupGapError, ValueError) as exc:
+            logger.error("%s", exc)
+            return 2
+
     mode = "backfill" if window.backfill else "catch-up"
     logger.info("Window (%s): %s through %s", mode, window.start, window.end)
 
@@ -381,30 +418,53 @@ def run(
         f"snapshots as of {window.end}",
         outcomes,
     )
-    ids = new_person_ids(outcomes.player_ids, loaded_through, window, outcomes.failed)
+    ids = new_person_ids(outcomes.player_ids, prior_mark, mark_key, window, outcomes.failed)
     run_step(pipeline, people_config(ids, session), "people", outcomes)
 
     common.log_schema_changes(before, common.table_columns(pipeline))
     common.log_row_counts(dict(outcomes.row_counts))
     log_outcomes(outcomes)
-    logger.info("Watermark now: %s", stored_watermark(pipeline) or "none")
+    new_mark = common.stored_watermark(pipeline, SOURCE_NAME, mark_key)
+    logger.info(
+        "%s now: %s", "Backfill progress" if chunk_days else "Watermark", new_mark or "none"
+    )
     logger.info("Total duration %.1fs", time.monotonic() - run_started)
 
     if outcomes.failed:
         failed = ", ".join(d.isoformat() for d in outcomes.failed)
-        logger.error("Failed days (re-run with --start/--end to retry): %s", failed)
+        retry = (
+            "the next --chunk-days firing will retry this chunk"
+            if chunk_days
+            else "re-run with --start/--end to retry"
+        )
+        logger.error("Failed days (%s): %s", retry, failed)
         return 1
     return 0
 
 
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
-    """Parse --start/--end flags."""
+    """Parse --start/--end/--chunk-days flags."""
     parser = argparse.ArgumentParser(description="Load MLB Stats API data into the lake.")
     parser.add_argument("--start", type=date.fromisoformat, help="first day (YYYY-MM-DD)")
     parser.add_argument("--end", type=date.fromisoformat, help="last day (YYYY-MM-DD)")
+    parser.add_argument(
+        "--chunk-days",
+        type=int,
+        nargs="?",
+        const=config.BACKFILL_CHUNK_DAYS,
+        default=None,
+        help=(
+            "automatic backfill: load N days from backfilled_through, then stop "
+            f"(BACKFILL_CHUNK_DAYS={config.BACKFILL_CHUNK_DAYS} if given with no N)"
+        ),
+    )
     args = parser.parse_args(argv)
     if (args.start is None) != (args.end is None):
         parser.error("--start and --end must be given together")
+    if args.chunk_days is not None and (args.start is not None or args.end is not None):
+        parser.error("--chunk-days cannot be combined with --start/--end")
+    if args.chunk_days is not None and args.chunk_days < 1:
+        parser.error(f"--chunk-days must be at least 1, got {args.chunk_days}")
     return args
 
 
@@ -413,7 +473,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     config.setup_logging(PIPELINE_NAME)
     config.ensure_directories()
-    return run(args.start, args.end)
+    return run(args.start, args.end, chunk_days=args.chunk_days)
 
 
 if __name__ == "__main__":

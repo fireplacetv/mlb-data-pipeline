@@ -17,6 +17,11 @@ MAX_CATCHUP_DAYS = int(os.getenv("MAX_CATCHUP_DAYS", "30"))
 GIANTS_TEAM_ID = int(os.getenv("GIANTS_TEAM_ID", "137"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
+# Automatic backfill (ARCHITECTURE.md §6.6, docs/roadmap/phase-2-cloud-and-scale.md P2M4):
+# where history starts, and how many days each --chunk-days firing covers.
+BACKFILL_START = date.fromisoformat(os.getenv("BACKFILL_START", "2015-04-01"))
+BACKFILL_CHUNK_DAYS = int(os.getenv("BACKFILL_CHUNK_DAYS", "30"))
+
 # Lake destination (docs/roadmap/phase-2-cloud-and-scale.md, P2M1), in the order Cloudflare
 # shows them. An empty S3_BUCKET_URL means the local lake under MLB_DATA_DIR; the bucket's
 # R2 S3 API URL means the cloud lake, which needs IS_PROD=true.
@@ -75,6 +80,8 @@ def log_config() -> None:
     logger.info(f"MAX_CATCHUP_DAYS: {MAX_CATCHUP_DAYS}")
     logger.info(f"GIANTS_TEAM_ID: {GIANTS_TEAM_ID}")
     logger.info(f"IS_PROD: {IS_PROD}")
+    logger.info(f"BACKFILL_START: {BACKFILL_START}")
+    logger.info(f"BACKFILL_CHUNK_DAYS: {BACKFILL_CHUNK_DAYS}")
 
 
 # --- Lake destination (docs/roadmap/phase-2-cloud-and-scale.md, P2M1) --------
@@ -270,6 +277,30 @@ def next_watermark(
     if loaded_through is None:
         return candidate
     return max(loaded_through, candidate)
+
+
+def next_backfill_window(
+    backfilled_through: date | None,
+    floor: date,
+    yesterday_: date,
+    chunk_days: int,
+) -> LoadWindow | None:
+    """Choose the next contiguous backfill chunk, starting at floor or backfilled_through + 1.
+
+    Returns None once the backfill has reached yesterday_: nothing left to load. Chunks are
+    always contiguous (each starts the day after the last one ended), including across the
+    off-season (in_season() skips those days without a request) — that keeps next_watermark's
+    connectedness check satisfied, so backfilled_through advances on every fully-succeeded
+    chunk and a failed day holds it at the start of the chunk that failed, for the next
+    firing to retry (ARCHITECTURE.md §6.6).
+    """
+    if chunk_days < 1:
+        raise ValueError(f"chunk_days must be at least 1, got {chunk_days}")
+    start = floor if backfilled_through is None else backfilled_through + timedelta(days=1)
+    if start > yesterday_:
+        return None
+    end = min(start + timedelta(days=chunk_days - 1), yesterday_)
+    return LoadWindow(start, end, backfill=True)
 
 
 def in_season(day: date) -> bool:
