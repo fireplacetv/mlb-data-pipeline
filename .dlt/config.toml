@@ -9,3 +9,12 @@ layout = "{table_name}/{load_id}.{file_id}.{ext}"
 # DataFrame/arrow rows don't get _dlt_load_id unless asked; staging dedups on it (§6.2).
 [normalize.parquet_normalizer]
 add_dlt_load_id = true
+
+# Statcast columns occasionally change type day to day within the same catch-up window (e.g.
+# arm_angle: int64 one day, double another) — a routine case, not just large backfills, since
+# every catch-up run buffers LOOKBACK_DAYS+1 days together. "none" (the default) raises
+# IncompatibleArrowSchema when that happens; "default" rotates the incompatible day into its
+# own Parquet file instead, which read_parquet(union_by_name=true) already reconciles like any
+# other cross-file column drift (§6.5, §7.2).
+[data_writer]
+arrow_concat_promote_options = "default"
