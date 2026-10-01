@@ -198,7 +198,7 @@ Development and CI use the local lake. Production writes the lake to [Cloudflare
 
 **GitHub Actions Secrets and Variables** (for the daily scheduled run, `.github/workflows/scheduled-ingest.yml`): in the repository's **Settings → Secrets and variables → Actions**, add:
 
-- Secrets `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`, with the token's keys from step 2 above.
+- Secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, with the token's keys from step 2 above.
 - A **variable** (not a secret) `S3_BUCKET_URL`, with the same value you'd put in your own `.env` (step 3 above).
 
 The workflow writes these into the runner's `.env` as `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `S3_BUCKET_URL`, plus `IS_PROD=true`, since Compose passes settings to the container only through `.env`. See [`docs/usage.md`](./usage.md#scheduled-runs-and-github-actions) for what the workflow runs and how to trigger it manually.

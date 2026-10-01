@@ -85,8 +85,8 @@ The AWS-style key names are used because R2 speaks the S3 API, and they're the n
 
 | Name | Kind | Maps to | Why not the other kind |
 |---|---|---|---|
-| `R2_ACCESS_KEY_ID` | Secret | `AWS_ACCESS_KEY_ID` | A credential; secrets are masked in logs and not readable after creation. |
-| `R2_SECRET_ACCESS_KEY` | Secret | `AWS_SECRET_ACCESS_KEY` | Same. |
+| `AWS_ACCESS_KEY_ID` | Secret | `AWS_ACCESS_KEY_ID` | A credential; secrets are masked in logs and not readable after creation. |
+| `AWS_SECRET_ACCESS_KEY` | Secret | `AWS_SECRET_ACCESS_KEY` | Same. |
 | `S3_BUCKET_URL` | Variable | `S3_BUCKET_URL` | Names an account and bucket, not a credential; variables are visible in the UI, which makes misconfiguration easier to spot (the same reasoning as the `CI_INGEST_DATE` variable for `ci.yml`). |
 
 Missing or mismatched values fail the same way a bad local `.env` would: `resolve_lake` raises `LakeConfigError`, and the step that runs the pipeline exits `2` with a message naming the setting (see "Troubleshooting Configuration" below).

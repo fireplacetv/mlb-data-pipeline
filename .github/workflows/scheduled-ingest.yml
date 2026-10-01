@@ -41,8 +41,8 @@ jobs:
 
       - name: Configure environment
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           S3_BUCKET_URL: ${{ vars.S3_BUCKET_URL }}
         run: |
           # Values come from the environment, never interpolated into a shell command, so a
@@ -98,8 +98,8 @@ jobs:
       # the built warehouse (e.g. a future report build), without needing R2 read access itself.
       - name: Upload warehouse to R2
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           S3_BUCKET_URL: ${{ vars.S3_BUCKET_URL }}
         run: |
           read -r BUCKET_PATH ENDPOINT_URL <<<"$(python3 -c "
