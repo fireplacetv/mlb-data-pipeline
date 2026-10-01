@@ -73,6 +73,18 @@ The lake layout is the same everywhere: `raw_statcast/pitches/*.parquet`, `raw_m
 
 The AWS-style key names are used because R2 speaks the S3 API, and they're the names Cloudflare's token page uses. For R2 setup (bucket, API token, GitHub Actions Secrets), see [`docs/setup.md`](./setup.md#optional-cloud-lake-on-cloudflare-r2).
 
+**GitHub Actions Secrets and Variables (scheduled production runs)**
+
+`.github/workflows/scheduled-ingest.yml` (`docs/usage.md#scheduled-runs-and-github-actions`) is the only workflow that writes to R2; `ci.yml` always uses the local lake. It builds its own `.env` from repository settings under **Settings → Secrets and variables → Actions**:
+
+| Name | Kind | Maps to | Why not the other kind |
+|---|---|---|---|
+| `R2_ACCESS_KEY_ID` | Secret | `AWS_ACCESS_KEY_ID` | A credential; secrets are masked in logs and not readable after creation. |
+| `R2_SECRET_ACCESS_KEY` | Secret | `AWS_SECRET_ACCESS_KEY` | Same. |
+| `S3_BUCKET_URL` | Variable | `S3_BUCKET_URL` | Names an account and bucket, not a credential; variables are visible in the UI, which makes misconfiguration easier to spot (the same reasoning as the `CI_INGEST_DATE` variable for `ci.yml`). |
+
+Missing or mismatched values fail the same way a bad local `.env` would: `resolve_lake` raises `LakeConfigError`, and the step that runs the pipeline exits `2` with a message naming the setting (see "Troubleshooting Configuration" below).
+
 dbt reads the lake from the same place: with `S3_BUCKET_URL` set, `dbt build` reads the Parquet and load markers straight from the R2 bucket (see "dbt Configuration" below), so the same `.env` drives ingest and `dbt build`. The warehouse file itself stays local, at `<MLB_DATA_DIR>/warehouse/mlb.duckdb`.
 
 **`DBT_OUTPUT_MODE`**

@@ -110,7 +110,7 @@ See [`docs/usage.md`](./docs/usage.md) for full details on each command.
 ## Documentation
 
 - **[`docs/setup.md`](./docs/setup.md):** Environment setup, first run, troubleshooting.
-- **[`docs/usage.md`](./docs/usage.md):** Detailed command reference, including what CI (`.github/workflows/ci.yml`) runs on PRs and merges to `main`.
+- **[`docs/usage.md`](./docs/usage.md):** Detailed command reference, including what CI (`.github/workflows/ci.yml`) runs on PRs and merges to `main`, and the daily production run (`.github/workflows/scheduled-ingest.yml`).
 - **[`docs/configuration.md`](./docs/configuration.md):** Every environment variable and config option.
 - **[`docs/roadmap/`](./docs/roadmap/):** Design docs for future development phases.
 - **[`ARCHITECTURE.md`](./ARCHITECTURE.md):** Full design spec, data sources, extract/load, staging, warehouse, Docker setup.

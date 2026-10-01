@@ -338,6 +338,31 @@ docker compose run --rm reports run build
 
 ---
 
+## Scheduled Runs and GitHub Actions
+
+`.github/workflows/scheduled-ingest.yml` runs the production pipeline daily with no manual intervention (`docs/roadmap/phase-2-cloud-and-scale.md`, P2M2): catch up both pipelines against the R2 lake, rebuild the warehouse, upload it to R2, and publish the data report.
+
+**Schedule:** `0 2 * * *` (2 AM UTC), every day of the year. Off-season days load zero games — the pipelines already skip dates outside the season (`SEASON_START`/`SEASON_END`) — so nothing special is needed to pause it.
+
+**What it does, on an `ubuntu-latest` runner:**
+
+1. Writes `.env` from `.env.example`, with `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` set from the `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` repository secrets, `S3_BUCKET_URL` from the repository variable of the same name, and `IS_PROD=true`. This is the only workflow that writes to R2; CI (`ci.yml`) always uses the local lake.
+2. Runs `docker compose build`, then both pipelines with no flags (catch-up from the watermark stored in the R2 lake) — or with `--start`/`--end` when the run was triggered manually with those inputs (see "Manual trigger and backfills" below).
+3. Runs `docker compose run --rm dbt build`, which reads the R2 lake and writes the warehouse locally (DuckDB has no server mode to write to remotely; see `docs/roadmap/phase-2-cloud-and-scale.md`).
+4. Uploads `data/warehouse/mlb.duckdb` to the R2 bucket as a single object (`aws s3 cp --endpoint-url ...`), so the built warehouse persists past the runner (the `aws` CLI is preinstalled on `ubuntu-latest`; no R2 read access is needed to use it).
+5. Builds the data report from that same local warehouse file and publishes it to the GitHub Pages site root (`https://<owner>.github.io/<repo>/`), the same way `ci.yml` does on a push to `main`. Both workflows share the `gh-pages` concurrency group so they never race.
+6. Uploads `data/logs/` and `dbt/logs/` as the `scheduled-ingest-logs` artifact, even on failure.
+
+A failed run shows red in the Actions tab and in its job summary; there's no separate notification channel today (open question in the phase doc).
+
+**One-time repository setup:** in **Settings → Secrets and variables → Actions**, add secrets `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`, and a **variable** (not a secret — it names no credential, only the bucket) `S3_BUCKET_URL`, each from the R2 bucket and token described in [`docs/setup.md`](./setup.md#optional-cloud-lake-on-cloudflare-r2). Without these, the workflow fails at the first pipeline step with the same `LakeConfigError` message you'd see running locally with a bad `.env`.
+
+**Manual trigger and backfills:** run the workflow from the GitHub UI (Actions → Scheduled ingest → Run workflow), optionally with `start` and `end` inputs (`YYYY-MM-DD`) to run a one-off backfill against R2 instead of a catch-up. Leave both empty for an ad hoc catch-up run outside the schedule.
+
+**Checking it ran:** the Actions tab lists each run; open one to see per-step logs, or download the `scheduled-ingest-logs` artifact for the same `data/logs/` and `dbt/logs/` files a local run would produce.
+
+---
+
 ## Inspecting Data
 
 ### Query the warehouse

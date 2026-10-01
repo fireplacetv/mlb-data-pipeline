@@ -1,0 +1,162 @@
+name: Scheduled ingest
+
+# Daily production run (docs/roadmap/phase-2-cloud-and-scale.md, P2M2): catch up both
+# pipelines against the R2 lake, rebuild the warehouse, upload it to R2, and publish the
+# data report. `workflow_dispatch` also allows a manual run, with optional --start/--end
+# for a backfill, from the GitHub UI.
+on:
+  schedule:
+    # 2 AM UTC, after US games end and before US morning. Runs year-round; off-season
+    # days load zero games (the pipelines already skip dates outside the season).
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "Backfill start date (YYYY-MM-DD). Leave empty to catch up from the watermark."
+        required: false
+      end:
+        description: "Backfill end date (YYYY-MM-DD). Required if start is set."
+        required: false
+
+concurrency:
+  # Shared with ci.yml's publish-report job: both write to gh-pages and must not race.
+  group: gh-pages
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  DBT_OUTPUT_MODE: production
+
+jobs:
+  scheduled-ingest:
+    name: Ingest + dbt + upload + report (production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure environment
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          S3_BUCKET_URL: ${{ vars.S3_BUCKET_URL }}
+        run: |
+          # Values come from the environment, never interpolated into a shell command, so a
+          # key or URL with regex-special characters can't corrupt the substitution.
+          python3 - <<'PYEOF'
+          import os
+          import re
+          from pathlib import Path
+
+          overrides = {
+              "UID": str(os.getuid()),
+              "GID": str(os.getgid()),
+              "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+              "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+              "S3_BUCKET_URL": os.environ["S3_BUCKET_URL"],
+              "IS_PROD": "true",
+          }
+          text = Path(".env.example").read_text()
+          for key, value in overrides.items():
+              text = re.sub(rf"(?m)^{key}=.*$", f"{key}={value}", text)
+          Path(".env").write_text(text)
+          PYEOF
+          mkdir -p data
+
+      - name: Build image
+        run: docker compose build
+
+      - name: Ingest Statcast
+        env:
+          BACKFILL_START: ${{ inputs.start }}
+          BACKFILL_END: ${{ inputs.end }}
+        run: |
+          args=()
+          if [ -n "$BACKFILL_START" ]; then args+=(--start "$BACKFILL_START" --end "$BACKFILL_END"); fi
+          docker compose run --rm pipeline python -m mlb.pipelines.statcast "${args[@]}"
+
+      - name: Ingest MLB Stats API
+        env:
+          BACKFILL_START: ${{ inputs.start }}
+          BACKFILL_END: ${{ inputs.end }}
+        run: |
+          args=()
+          if [ -n "$BACKFILL_START" ]; then args+=(--start "$BACKFILL_START" --end "$BACKFILL_END"); fi
+          docker compose run --rm pipeline python -m mlb.pipelines.mlb_api "${args[@]}"
+
+      - name: dbt build
+        run: docker compose run --rm dbt build
+
+      # P2M1's design (docs/roadmap/phase-2-cloud-and-scale.md): DuckDB has no server mode to
+      # write to remotely, so dbt builds the warehouse to a local file even in prod, rebuilt
+      # from the R2 lake every run (principle 2, the warehouse is disposable). Upload it as a
+      # single object so it persists past this ephemeral runner, for the report build below
+      # and any other consumer, without needing R2 read access themselves.
+      - name: Upload warehouse to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          S3_BUCKET_URL: ${{ vars.S3_BUCKET_URL }}
+        run: |
+          read -r BUCKET_PATH ENDPOINT_URL <<<"$(python3 -c "
+          import os
+          from urllib.parse import urlsplit
+          parts = urlsplit(os.environ['S3_BUCKET_URL'])
+          print(parts.path.strip('/'), f'https://{parts.netloc}')
+          ")"
+          aws s3 cp data/warehouse/mlb.duckdb "s3://$BUCKET_PATH/mlb.duckdb" \
+            --endpoint-url "$ENDPOINT_URL"
+
+      # Same report as ci.yml's main-branch build: root base path, built from the warehouse
+      # this run just produced (no R2 read needed).
+      - name: Build data report
+        id: report
+        if: ${{ !cancelled() }}
+        env:
+          REPORT_GIT_SHA: ${{ github.sha }}
+        run: |
+          docker compose run --rm reports ci
+          docker compose run --rm \
+            -e VITE_REPORT_BUILT_AT="$(date -u '+%Y-%m-%d %H:%M UTC')" \
+            -e VITE_REPORT_GIT_SHA="$REPORT_GIT_SHA" \
+            reports run build
+
+      - name: Publish data report
+        if: ${{ !cancelled() && steps.report.outcome == 'success' }}
+        uses: JamesIves/github-pages-deploy-action@v4.9.0
+        with:
+          folder: reports/build/
+          branch: gh-pages
+          # Keep the PR previews that ci.yml publishes; rebase instead of force-pushing.
+          clean-exclude: pr-preview/
+          force: false
+
+      # Same fix as ci.yml: without this, GitHub Pages runs Jekyll, which drops Evidence's
+      # _app/ folder (its CSS and JS).
+      - name: Turn off Jekyll on gh-pages
+        if: ${{ !cancelled() && steps.report.outcome == 'success' }}
+        run: |
+          git fetch --depth 1 origin gh-pages
+          if git cat-file -e origin/gh-pages:.nojekyll 2>/dev/null; then
+            exit 0
+          fi
+          git worktree add --detach "$RUNNER_TEMP/gh-pages" origin/gh-pages
+          cd "$RUNNER_TEMP/gh-pages"
+          touch .nojekyll
+          git add .nojekyll
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Add .nojekyll so GitHub Pages serves _app/"
+          git push origin HEAD:gh-pages
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scheduled-ingest-logs
+          path: |
+            data/logs/
+            dbt/logs/
+          if-no-files-found: ignore
