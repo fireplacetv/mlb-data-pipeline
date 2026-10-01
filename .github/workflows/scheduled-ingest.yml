@@ -1,9 +1,10 @@
 name: Scheduled ingest
 
 # Daily production run (docs/roadmap/phase-2-cloud-and-scale.md, P2M2): catch up both
-# pipelines against the R2 lake, rebuild the warehouse, upload it to R2, and publish the
-# data report. `workflow_dispatch` also allows a manual run, with optional --start/--end
-# for a backfill, from the GitHub UI.
+# pipelines against the R2 lake, rebuild the warehouse, and upload it to R2. The data
+# report stays CI-only (ci.yml), built from CI's own fixture/fixed-day data, not run here.
+# `workflow_dispatch` also allows a manual run, with optional --start/--end for a backfill,
+# from the GitHub UI.
 on:
   schedule:
     # 2 AM UTC, after US games end and before US morning. Runs year-round; off-season
@@ -19,19 +20,20 @@ on:
         required: false
 
 concurrency:
-  # Shared with ci.yml's publish-report job: both write to gh-pages and must not race.
-  group: gh-pages
+  # One run at a time: a manual dispatch overlapping the next cron firing (or a long
+  # backfill running past the next day's trigger) would race on the same R2 watermark.
+  group: scheduled-ingest
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   DBT_OUTPUT_MODE: production
 
 jobs:
   scheduled-ingest:
-    name: Ingest + dbt + upload + report (production)
+    name: Ingest + dbt + upload (production)
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -92,8 +94,8 @@ jobs:
       # P2M1's design (docs/roadmap/phase-2-cloud-and-scale.md): DuckDB has no server mode to
       # write to remotely, so dbt builds the warehouse to a local file even in prod, rebuilt
       # from the R2 lake every run (principle 2, the warehouse is disposable). Upload it as a
-      # single object so it persists past this ephemeral runner, for the report build below
-      # and any other consumer, without needing R2 read access themselves.
+      # single object so it persists past this ephemeral runner, for any consumer that needs
+      # the built warehouse (e.g. a future report build), without needing R2 read access itself.
       - name: Upload warehouse to R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -108,48 +110,6 @@ jobs:
           ")"
           aws s3 cp data/warehouse/mlb.duckdb "s3://$BUCKET_PATH/mlb.duckdb" \
             --endpoint-url "$ENDPOINT_URL"
-
-      # Same report as ci.yml's main-branch build: root base path, built from the warehouse
-      # this run just produced (no R2 read needed).
-      - name: Build data report
-        id: report
-        if: ${{ !cancelled() }}
-        env:
-          REPORT_GIT_SHA: ${{ github.sha }}
-        run: |
-          docker compose run --rm reports ci
-          docker compose run --rm \
-            -e VITE_REPORT_BUILT_AT="$(date -u '+%Y-%m-%d %H:%M UTC')" \
-            -e VITE_REPORT_GIT_SHA="$REPORT_GIT_SHA" \
-            reports run build
-
-      - name: Publish data report
-        if: ${{ !cancelled() && steps.report.outcome == 'success' }}
-        uses: JamesIves/github-pages-deploy-action@v4.9.0
-        with:
-          folder: reports/build/
-          branch: gh-pages
-          # Keep the PR previews that ci.yml publishes; rebase instead of force-pushing.
-          clean-exclude: pr-preview/
-          force: false
-
-      # Same fix as ci.yml: without this, GitHub Pages runs Jekyll, which drops Evidence's
-      # _app/ folder (its CSS and JS).
-      - name: Turn off Jekyll on gh-pages
-        if: ${{ !cancelled() && steps.report.outcome == 'success' }}
-        run: |
-          git fetch --depth 1 origin gh-pages
-          if git cat-file -e origin/gh-pages:.nojekyll 2>/dev/null; then
-            exit 0
-          fi
-          git worktree add --detach "$RUNNER_TEMP/gh-pages" origin/gh-pages
-          cd "$RUNNER_TEMP/gh-pages"
-          touch .nojekyll
-          git add .nojekyll
-          git -c user.name="github-actions[bot]" \
-            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit -m "Add .nojekyll so GitHub Pages serves _app/"
-          git push origin HEAD:gh-pages
 
       - name: Upload logs
         if: always()
