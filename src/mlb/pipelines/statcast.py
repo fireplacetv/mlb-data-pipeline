@@ -148,7 +148,7 @@ def statcast_source(
 def build_pipeline(
     data_dir: Path, schema_dir: Path, lake: config.Lake | None = None
 ) -> dlt.Pipeline:
-    """Create the statcast dlt pipeline writing Parquet to the lake (BUCKET_URL by default)."""
+    """Create the statcast dlt pipeline writing Parquet to the lake."""
     return common.build_pipeline(PIPELINE_NAME, DATASET_NAME, data_dir, schema_dir, lake)
 
 

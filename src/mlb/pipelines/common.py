@@ -23,7 +23,7 @@ def lake_destination(lake: config.Lake) -> dlt.destinations.filesystem:
         aws_secret_access_key=lake.secret_access_key,
         endpoint_url=lake.endpoint_url,
         # R2 ignores the region but S3 clients need one; "auto" is what R2 documents.
-        region_name="auto" if lake.endpoint_url else None,
+        region_name="auto",
     )
     return dlt.destinations.filesystem(bucket_url=lake.bucket_url, credentials=credentials)
 
@@ -37,8 +37,8 @@ def build_pipeline(
 ) -> dlt.Pipeline:
     """Create a dlt pipeline writing Parquet to the lake (§6.2).
 
-    The lake defaults to the one BUCKET_URL / IS_PROD describe (data_dir/lake when
-    BUCKET_URL is empty). Raises config.LakeConfigError for an unusable setup.
+    The lake defaults to the one S3_BUCKET_URL / IS_PROD describe (data_dir/lake when
+    S3_BUCKET_URL is empty). Raises config.LakeConfigError for an unusable setup.
     """
     lake = lake or config.lake_from_env(data_dir)
     logger.info("Lake destination: %s", lake.describe())

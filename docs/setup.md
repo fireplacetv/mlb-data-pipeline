@@ -33,7 +33,7 @@ The defaults in `.env.example` work for most users. Open `.env` and review:
 - **`GIANTS_TEAM_ID`:** Not yet used; kept for reference.
 - **`LOG_LEVEL`:** Set to `INFO` for normal runs, `DEBUG` for troubleshooting.
 - **`UID` and `GID` (Linux only):** See the note in `.env.example`. On macOS, leave as-is.
-- **`BUCKET_URL`, `IS_PROD`, `AWS_*`, `R2_ACCOUNT_ID`:** Leave empty / `false` to keep the lake local. Only production runs write to the cloud lake (see [Optional: cloud lake on Cloudflare R2](#optional-cloud-lake-on-cloudflare-r2)).
+- **`AWS_*`, `S3_BUCKET_URL`, `IS_PROD`:** Leave empty / `false` to keep the lake local. Only production runs write to the cloud lake (see [Optional: cloud lake on Cloudflare R2](#optional-cloud-lake-on-cloudflare-r2)).
 
 See [`docs/configuration.md`](./configuration.md) for detailed explanations of every variable.
 
@@ -175,13 +175,13 @@ Development and CI use the local lake. Production writes the lake to [Cloudflare
 3. **Point the pipeline at it.** In your `.env` (never in `.env.example`):
 
    ```bash
-   BUCKET_URL=https://<account id>.r2.cloudflarestorage.com/mlb-lake/prod
-   IS_PROD=true
    AWS_ACCESS_KEY_ID=<access key id>
    AWS_SECRET_ACCESS_KEY=<secret access key>
+   S3_BUCKET_URL=https://<account id>.r2.cloudflarestorage.com/mlb-lake/prod
+   IS_PROD=true
    ```
 
-   That's the S3 API URL from step 1 with a folder (`/prod`) added, so the lake sits in a folder of the bucket. `R2_ACCOUNT_ID` stays empty: the ID is already in the URL. (Equivalently, `BUCKET_URL=s3://mlb-lake/prod` plus `R2_ACCOUNT_ID=<account id>`.)
+   `S3_BUCKET_URL` is the S3 API URL from step 1 with a folder (`/prod`) added, so the lake sits in a folder of the bucket. The folder is optional.
 
 4. **Run an ingest and check the destination.** The first log line of the run names it:
 
@@ -192,7 +192,7 @@ Development and CI use the local lake. Production writes the lake to [Cloudflare
 
    The bucket then holds `prod/raw_statcast/pitches/*.parquet`, `prod/raw_statcast/_dlt_loads/`, and `prod/raw_statcast/_dlt_pipeline_state/`, the same layout as `data/lake/`.
 
-5. **Switch back** by emptying `BUCKET_URL` and setting `IS_PROD=false`. The two settings must agree, or the pipeline refuses to run (see [`docs/configuration.md`](./configuration.md#environment-variable-details)).
+5. **Switch back** by emptying `S3_BUCKET_URL` and setting `IS_PROD=false`. The two settings must agree, or the pipeline refuses to run (see [`docs/configuration.md`](./configuration.md#environment-variable-details)).
 
 **GitHub Actions Secrets** (for the scheduled run, coming in P2M2): in the repository's Settings → Secrets and variables → Actions, add `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` with the token's keys. The workflow writes them into the runner's `.env` as `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, since Compose passes settings to the container only through `.env`.
 

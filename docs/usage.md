@@ -52,14 +52,14 @@ docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2024-0
 - Each run is **one dlt load**: running the same range twice appends a second copy of the rows with a new `_dlt_load_id`. Staging deduplicates (latest load wins).
 - Backfills (`--start`/`--end`) turn on the pybaseball cache in `data/cache/pybaseball/`, so re-running a failed backfill doesn't re-download the days that already succeeded. Catch-up runs never use the cache, so they always see Savant's latest revisions. Cached days don't expire for a year: if you re-backfill a recent range to pick up revisions, clear the cache first (see "Resetting").
 
-**Output** (paths shown for the default local lake; with `BUCKET_URL` set, the same layout lands under that URL instead, see [`docs/configuration.md`](./configuration.md)):
+**Output** (paths shown for the default local lake; with `S3_BUCKET_URL` set, the same layout lands in that R2 bucket instead, see [`docs/configuration.md`](./configuration.md)):
 - Parquet files in `data/lake/raw_statcast/pitches/`, named `<load_id>.<file_id>.parquet`. Every row carries `_dlt_load_id`.
 - One completed-load marker per load: `data/lake/raw_statcast/_dlt_loads/statcast__<load_id>.jsonl`. A load id without a marker didn't finish, and staging ignores its rows.
 - dlt's own tables next to them: `_dlt_pipeline_state/` (the synced watermark) and `_dlt_version/` (schema versions).
 - The dlt schema in `schemas/export/statcast.schema.yaml`. Commit it: a new, removed, or retyped column shows up as a git diff.
 - Logs to stdout and `data/logs/statcast_<timestamp>.log`: the lake destination, the watermark, the window, rows per day, schema changes (new tables, new columns, variant columns), rows loaded per table, duration per dlt step, and the new watermark.
 
-**Exit codes:** `0` success; `1` one or more days failed (the rest loaded); `2` refused to run (catch-up gap over `MAX_CATCHUP_DAYS`, invalid flags, or a lake setting that doesn't add up: see `BUCKET_URL` in [`docs/configuration.md`](./configuration.md)).
+**Exit codes:** `0` success; `1` one or more days failed (the rest loaded); `2` refused to run (catch-up gap over `MAX_CATCHUP_DAYS`, invalid flags, or a lake setting that doesn't add up: see `S3_BUCKET_URL` in [`docs/configuration.md`](./configuration.md)).
 
 **Duration:** A few seconds for two days, minutes to hours for a season, depending on network and Savant responsiveness.
 

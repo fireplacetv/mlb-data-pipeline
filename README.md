@@ -53,7 +53,7 @@ docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2025-0
 docker compose run --rm pipeline python -m mlb.pipelines.mlb_api --start 2025-09-01 --end 2025-09-02
 ```
 
-Data lands in `data/lake/` as Parquet files. Production runs write the same lake to Cloudflare R2 instead, chosen with `BUCKET_URL` and `IS_PROD` in `.env` (see [`docs/configuration.md`](./docs/configuration.md)); leave them unset to stay local.
+Data lands in `data/lake/` as Parquet files. Production runs write the same lake to Cloudflare R2 instead, chosen with `S3_BUCKET_URL` and `IS_PROD` in `.env` (see [`docs/configuration.md`](./docs/configuration.md)); leave them unset to stay local.
 
 ### 5. Build and test the staging layer
 
