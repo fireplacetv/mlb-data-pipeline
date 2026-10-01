@@ -68,8 +68,8 @@ Requires Phase 0 (pipeline and staging) to be complete. Phase 1 (modeling layer)
   In the order Cloudflare shows them. `S3_BUCKET_URL` (originally `BUCKET_URL`) defaults to empty, not `file://./data/lake`: dlt reads `file://./data/lake` as the absolute path `/data/lake` (the `.` is taken as a host), which only matches the container's `MLB_DATA_DIR` by coincidence, and empty keeps the lake tied to `MLB_DATA_DIR`, where dbt reads it. `R2_BUCKET_NAME` and `R2_ACCOUNT_ID` are dropped: the bucket and account ID are both in `S3_BUCKET_URL`. No `R2_API_TOKEN`: the token value is for Cloudflare's own API, and the S3 API uses only the access key pair.
 - `.dlt/config.toml`: no change; env vars drive the destination in code.
 - GitHub Actions Secrets (in repo settings):
-  - `R2_ACCESS_KEY_ID`
-  - `R2_SECRET_ACCESS_KEY`
+  - `AWS_ACCESS_KEY_ID`
+  - `AWS_SECRET_ACCESS_KEY`
 
 ### Changes to documentation
 
@@ -110,7 +110,7 @@ Update §9 (Environment) to include the scheduled-ingest workflow and GitHub Act
 
 **Acceptance checks:**
 - `.github/workflows/scheduled-ingest.yml` exists and is triggered daily at 2 AM UTC (off-season or seasonal?).
-- Workflow reads R2 credentials from GitHub Actions Secrets (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`).
+- Workflow reads R2 credentials from GitHub Actions Secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`).
 - Workflow sets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_URL`, `IS_PROD=true`.
 - Workflow runs: `docker compose run --rm pipeline python -m mlb.pipelines.statcast`, `docker compose run --rm pipeline python -m mlb.pipelines.mlb_api`, `docker compose run --rm dbt build`, `docker compose run --rm reports run build`.
 - On success: data lands in R2, warehouse is built, report is generated and published to `gh-pages`.
@@ -148,6 +148,7 @@ Revisit only if the project moves to multiple concurrent writers, needs lake-lev
 - **2026-10-01:** First real R2 setup pasted the account endpoint (`https://<id>.r2.cloudflarestorage.com/`) into `BUCKET_URL` and was refused. `BUCKET_URL` now also takes the bucket's S3 API URL from Cloudflare's bucket Settings page, and an account endpoint with no bucket gets an error saying where to find the right URL. Then renamed in PR #12 review: `BUCKET_URL` → `S3_BUCKET_URL` (it holds the bucket's URL, not the account endpoint), taking only that URL. The `s3://` and `file://` forms and `R2_ACCOUNT_ID` are gone, so there is one way to write it, and the variables follow Cloudflare's order. Decided against `R2_API_TOKEN` (unused by the S3 API).
 - **2026-10-01:** dbt reads the lake from R2 too (option 1 of the open question): same `S3_BUCKET_URL`, keys from the environment, `httpfs` baked into the image.
 - **2026-10-01:** P2M2 built. `.github/workflows/scheduled-ingest.yml` runs daily at 2 AM UTC (`workflow_dispatch` also allows a manual run, with optional `start`/`end` inputs for a one-off backfill). It builds `.env` from `.env.example` with `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` (GitHub Actions Secrets) mapped to `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_URL` from a repository **variable** (not a secret — it decided this isn't a credential, following the `CI_INGEST_DATE` precedent), and `IS_PROD=true`; runs both pipelines, `dbt build`, then uploads `data/warehouse/mlb.duckdb` to R2 with `aws s3 cp --endpoint-url` (the preinstalled `aws` CLI on `ubuntu-latest`, no new dependency). Logs upload as an artifact on every run, including failures. Decided against a Slack/email failure notification (listed as optional in this doc's scope): a red Actions run plus the logs artifact is the whole alerting story for now; revisit if a silent failure is ever missed. Off-season runs are not special-cased — they load zero games via the existing season-window skip, rather than being paused. **PR #13 review:** the workflow does not build or publish the data report — that's CI-only (built from CI's own fixed-day data), not something the production pipeline needs to do on every run — so the report/publish/`.nojekyll` steps and the `gh-pages` concurrency group were dropped in favor of a `scheduled-ingest` group that just keeps this workflow's own runs from overlapping each other. Also confirmed: each pipeline's per-day politeness (sleep between days, retry with backoff) is hardcoded in `src/mlb/pipelines/statcast.py`/`mlb_api.py`, so it applies the same way on every invocation of this workflow, scheduled or manual — nothing here needs to set it separately.
+- **2026-10-01:** First scheduled run failed: `needs AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY`. The repo had never had `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` Secrets set — the R2 keys were pasted into repo **Variables** named `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` instead (wrong mechanism, and unmasked in a public repo). Renamed the workflow's secret references from `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` to `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` so the Secret name matches the env var it maps to (no more R2→AWS rename step to get wrong); updated `docs/usage.md`, `docs/setup.md`, `docs/configuration.md` to match. Separately, and not part of this PR: the leaked token must be rotated in Cloudflare and the plaintext Variables deleted before the new Secrets are set.
 
 ## References
 
