@@ -193,7 +193,7 @@ Development and CI use the local lake. Production writes the lake to [Cloudflare
 
 5. **Switch back** by emptying `BUCKET_URL` and setting `IS_PROD=false`. The two settings must agree, or the pipeline refuses to run (see [`docs/configuration.md`](./configuration.md#environment-variable-details)).
 
-**GitHub Actions Secrets** (for the scheduled run, coming in P2M2): in the repository's Settings → Secrets and variables → Actions, add `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` with the token's keys. The workflow maps them to `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`.
+**GitHub Actions Secrets** (for the scheduled run, coming in P2M2): in the repository's Settings → Secrets and variables → Actions, add `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` with the token's keys. The workflow writes them into the runner's `.env` as `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, since Compose passes settings to the container only through `.env`.
 
 The local lake and the R2 lake are separate: each has its own data and its own watermark.
 

@@ -234,11 +234,6 @@ environment:
   DBT_PROJECT_DIR: /app/dbt
   TZ: America/Los_Angeles
   USER: ${USER}
-  BUCKET_URL: ${BUCKET_URL:-}
-  IS_PROD: ${IS_PROD:-false}
-  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-  R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
 ```
 
 - **`MLB_DATA_DIR: /data`:** Inside the container, the bind-mounted `./data/` is at `/data`. Pipelines write there.
@@ -246,10 +241,9 @@ environment:
 - **`USER: ${USER:-dev}`:** Passes your host machine's username to the container for developer-specific schema naming in dev mode (e.g., `dbt_derrick_staging`). Defaults to `dev` if `$USER` is not set. This variable is typically set automatically in your shell on Linux and macOS.
 
 The `dbt` service's entrypoint runs `mkdir -p "$MLB_DATA_DIR/warehouse"` and then `dbt` with your arguments (`build` when none are given). DuckDB won't create a missing folder for its database file, and `data/warehouse` is meant to be deletable.
-- **`BUCKET_URL`, `IS_PROD`, `AWS_*`, `R2_ACCOUNT_ID`:** the lake destination. Compose fills each from your shell first, then from `.env`, so a value exported in the shell (as GitHub Actions does with secrets) reaches the container without editing `.env`.
 - **`TZ: America/Los_Angeles`:** For consistency (MLB games are in various US timezones, but most operations treat times as Pacific). Override if needed.
 
-You can add more variables to `.env` and they'll be picked up by `docker-compose.yml` automatically.
+Every other setting, including the lake destination (`BUCKET_URL`, `IS_PROD`, `AWS_*`, `R2_ACCOUNT_ID`), reaches the containers only through `env_file: .env`: every variable in `.env` is passed in, so a new variable needs no change to `docker-compose.yml`. `.env.example` is the list of every variable, and this document must match it. A variable exported in your shell but missing from `.env` does **not** reach the container; put it in `.env` (CI generates its `.env` from `.env.example`, and the scheduled workflow will append its secrets there).
 
 ### The `reports` service
 

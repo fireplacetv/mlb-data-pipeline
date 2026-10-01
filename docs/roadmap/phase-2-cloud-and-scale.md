@@ -48,10 +48,10 @@ Requires Phase 0 (pipeline and staging) to be complete. Phase 1 (modeling layer)
 
 ### Changes to Docker / environment
 
-- `docker-compose.yml`: add env vars `BUCKET_URL`, `IS_PROD`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `R2_ACCOUNT_ID` as `${VAR:-}` interpolations, so they come from the shell (GitHub Actions Secrets) or `.env` (built in P2M1).
+- `docker-compose.yml`: no change. `env_file: .env` already passes every variable in `.env` to the containers, and `.env.example` is the one list of variables (decided in P2M1 review, instead of repeating each one under `environment:`). The scheduled workflow (P2M2) builds `.env` from `.env.example`, as CI does, and appends `BUCKET_URL`, `IS_PROD=true`, and the R2 secrets to it.
 - `.env.example`: document new vars and their defaults (local paths).
 - CI workflow (`.github/workflows/scheduled-ingest.yml`): new job, runs daily at 2 AM UTC (after games end, before US morning).
-  - Sets `BUCKET_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` from GitHub Actions Secrets.
+  - Sets `BUCKET_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` from GitHub Actions Secrets, by writing them into the runner's `.env`.
   - Sets `IS_PROD=true` (gates R2 writes; dev runs omit this to stay local).
   - Runs ingest commands, then `dbt build`, then updates the data report.
   - On failure, logs to `data/logs/` and posts to GitHub Issues or email (optional).
