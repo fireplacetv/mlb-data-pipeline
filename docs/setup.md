@@ -196,7 +196,12 @@ Development and CI use the local lake. Production writes the lake to [Cloudflare
 
 5. **Switch back** by emptying `S3_BUCKET_URL` and setting `IS_PROD=false`. The two settings must agree, or the pipeline refuses to run (see [`docs/configuration.md`](./configuration.md#environment-variable-details)).
 
-**GitHub Actions Secrets** (for the scheduled run, coming in P2M2): in the repository's Settings → Secrets and variables → Actions, add `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` with the token's keys. The workflow writes them into the runner's `.env` as `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, since Compose passes settings to the container only through `.env`.
+**GitHub Actions Secrets and Variables** (for the daily scheduled run, `.github/workflows/scheduled-ingest.yml`): in the repository's **Settings → Secrets and variables → Actions**, add:
+
+- Secrets `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`, with the token's keys from step 2 above.
+- A **variable** (not a secret) `S3_BUCKET_URL`, with the same value you'd put in your own `.env` (step 3 above).
+
+The workflow writes these into the runner's `.env` as `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `S3_BUCKET_URL`, plus `IS_PROD=true`, since Compose passes settings to the container only through `.env`. See [`docs/usage.md`](./usage.md#scheduled-runs-and-github-actions) for what the workflow runs and how to trigger it manually.
 
 The local lake and the R2 lake are separate: each has its own data and its own watermark.
 
