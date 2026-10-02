@@ -93,6 +93,7 @@ See [`docs/usage.md`](./docs/usage.md) for full details on each command.
 | Ingest Statcast (backfill a date range) | `docker compose run --rm pipeline python -m mlb.pipelines.statcast --start YYYY-MM-DD --end YYYY-MM-DD` |
 | Ingest Statcast (one automatic backfill chunk) | `docker compose run --rm pipeline python -m mlb.pipelines.statcast --chunk-days` |
 | Ingest MLB Stats API | `docker compose run --rm pipeline python -m mlb.pipelines.mlb_api` (same flags) |
+| Show box scores of the last day loaded | `docker compose run --rm pipeline python -m mlb.box_scores` (or `--date YYYY-MM-DD`) |
 | Build and test staging | `docker compose run --rm dbt build` |
 | Rebuild from scratch | `docker compose run --rm dbt build --full-refresh` |
 | Run only some models | `docker compose run --rm dbt build --select stg_statcast__pitches` |

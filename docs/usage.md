@@ -351,7 +351,8 @@ docker compose run --rm reports run build
 2. Runs `docker compose build`, then both pipelines with no flags (catch-up from the watermark stored in the R2 lake) — or with `--start`/`--end` when the run was triggered manually with those inputs (see "Manual trigger and backfills" below). Both pipelines keep the same per-day politeness (sleep between days, retry with backoff) on every invocation, scheduled or manual: it's hardcoded in `src/mlb/pipelines/statcast.py` and `mlb_api.py` (§6.3/§6.4), not something this workflow configures, so a manual backfill gets exactly the same source-friendly pacing as a daily catch-up.
 3. Runs `docker compose run --rm dbt build`, which reads the R2 lake and writes the warehouse locally (DuckDB has no server mode to write to remotely; see `docs/roadmap/phase-2-cloud-and-scale.md`).
 4. Uploads `data/warehouse/mlb.duckdb` to the R2 bucket as a single object (`aws s3 cp --endpoint-url ...`), so the built warehouse persists past the runner (the `aws` CLI is preinstalled on `ubuntu-latest`; no R2 read access is needed to use it).
-5. Uploads `data/logs/` and `dbt/logs/` as the `scheduled-ingest-logs` artifact, even on failure.
+5. Logs the box scores of every game on the last day the MLB Stats API step loaded (`python -m mlb.box_scores`, see "Show box scores" below), for a quick visual check of the run. It runs even if an earlier step failed.
+6. Uploads `data/logs/` and `dbt/logs/` as the `scheduled-ingest-logs` artifact, even on failure.
 
 A failed run shows red in the Actions tab and in its job summary; there's no separate notification channel today (open question in the phase doc).
 
@@ -361,7 +362,7 @@ The `scheduled-ingest` concurrency group keeps runs from overlapping: a manual d
 
 **Manual trigger and backfills:** run the workflow from the GitHub UI (Actions → Scheduled ingest → Run workflow), optionally with `start` and `end` inputs (`YYYY-MM-DD`) to run a one-off backfill against R2 instead of a catch-up. Leave both empty for an ad hoc catch-up run outside the schedule.
 
-**Checking it ran:** the Actions tab lists each run; open one to see per-step logs, or download the `scheduled-ingest-logs` artifact for the same `data/logs/` and `dbt/logs/` files a local run would produce.
+**Checking it ran:** the Actions tab lists each run; open one to see per-step logs (the **Box scores (last day loaded)** step shows what the run landed for its final day), or download the `scheduled-ingest-logs` artifact for the same `data/logs/` and `dbt/logs/` files a local run would produce.
 
 ---
 
@@ -390,7 +391,7 @@ The `scheduled-ingest` concurrency group keeps runs from overlapping: a manual d
 
 **Manual trigger:** run the workflow from the GitHub UI (Actions → Automatic backfill → Run workflow), optionally with a `chunk_days` input to load a different number of days than `BACKFILL_CHUNK_DAYS` for that one run — for example a larger number to speed through a backfill faster than one default-sized chunk a day. Leave it empty to use the default.
 
-**Checking it ran:** the Actions tab lists each run; open one for per-step logs, or download the `backfill-logs` artifact for the same `data/logs/` files a local run would produce.
+**Checking it ran:** the Actions tab lists each run; open one for per-step logs (the **Box scores (last day loaded)** step shows the box scores of the chunk's final in-season day, or "nothing to show" for an off-season-only chunk), or download the `backfill-logs` artifact for the same `data/logs/` files a local run would produce.
 
 ---
 
@@ -410,6 +411,15 @@ Or use a shell and open DuckDB interactively:
 docker compose run --rm pipeline bash
 python -c "import duckdb; db = duckdb.connect('data/warehouse/mlb.duckdb', read_only=True); db.sql('SELECT * FROM staging.stg_statcast__pitches LIMIT 5;').show()"
 ```
+
+### Show box scores
+
+```bash
+docker compose run --rm pipeline python -m mlb.box_scores                    # last day the last mlb_api run loaded
+docker compose run --rm pipeline python -m mlb.box_scores --date 2025-09-01  # any day in the lake
+```
+
+Logs a box score for each Final game on the day — line score (R/H/E), then each team's batting (AB R H RBI BB SO HR) and pitching (IP H R ER BB SO HR NP) lines — read back from the lake (local or R2, whichever `.env` points at), not the API, so it shows what was actually ingested. When a day was loaded more than once (e.g. by `LOOKBACK_DAYS`), it uses that day's latest completed load. Without `--date`, it shows the last day the most recent `mlb_api` run loaded, which that run records in `data/mlb_api_last_day.txt`; if that run loaded no in-season day, it logs that there's nothing to show and exits `0`. Both scheduled workflows run it as their last step before uploading logs.
 
 ### List lake folders
 
