@@ -312,8 +312,9 @@ docker compose run --rm pipeline ruff format .
 3. Runs both dlt pipelines against the live sources for one fixed day: `2025-09-01`, unless the `CI_INGEST_DATE` repository variable is set (see "Changing the CI date" below). A pipeline whose module doesn't exist yet is skipped with a warning annotation.
 4. Runs `dbt run` and then `dbt test` on that day's data, which checks the staging column lists and tests against real API responses (unit tests use hand-written fixtures). They're separate steps so a model error and a test failure show up separately, and a failing test doesn't stop other models from building.
 5. Builds the data report (see "Data Report") if `dbt run` succeeded, even when `dbt test` failed, and uploads it as the `data-report` artifact.
-6. Uploads `data/logs/` and `dbt/logs/` as the `logs` artifact, even on failure.
-7. In a separate `publish-report` job, publishes the report to GitHub Pages on the `gh-pages` branch:
+6. Logs the box scores of every game on the ingested day (`python -m mlb.box_scores`, see "Show box scores"), next to the report, for a quick look in the job log. It runs even if dbt or the report failed.
+7. Uploads `data/logs/` and `dbt/logs/` as the `logs` artifact, even on failure.
+8. In a separate `publish-report` job, publishes the report to GitHub Pages on the `gh-pages` branch:
    - **On a PR:** to `https://<owner>.github.io/<repo>/pr-preview/pr-<N>/`. A bot comment on the PR links to it, updated on every push. `.github/workflows/report-preview-cleanup.yml` deletes the preview when the PR closes. PRs from forks don't get a preview.
    - **On `main`:** to `https://<owner>.github.io/<repo>/`, leaving the PR previews in place.
 
@@ -335,6 +336,7 @@ docker compose run --rm dbt run
 docker compose run --rm dbt test
 docker compose run --rm reports ci
 docker compose run --rm reports run build
+docker compose run --rm pipeline python -m mlb.box_scores
 ```
 
 ---
@@ -419,7 +421,7 @@ docker compose run --rm pipeline python -m mlb.box_scores                    # l
 docker compose run --rm pipeline python -m mlb.box_scores --date 2025-09-01  # any day in the lake
 ```
 
-Logs a box score for each Final game on the day — line score (R/H/E), then each team's batting (AB R H RBI BB SO HR) and pitching (IP H R ER BB SO HR NP) lines — read back from the lake (local or R2, whichever `.env` points at), not the API, so it shows what was actually ingested. When a day was loaded more than once (e.g. by `LOOKBACK_DAYS`), it uses that day's latest completed load. Without `--date`, it shows the last day the most recent `mlb_api` run loaded, which that run records in `data/mlb_api_last_day.txt`; if that run loaded no in-season day, it logs that there's nothing to show and exits `0`. Both scheduled workflows run it as their last step before uploading logs.
+Logs a box score for each Final game on the day — line score (R/H/E), then each team's batting (AB R H RBI BB SO HR) and pitching (IP H R ER BB SO HR NP) lines — read back from the lake (local or R2, whichever `.env` points at), not the API, so it shows what was actually ingested. When a day was loaded more than once (e.g. by `LOOKBACK_DAYS`), it uses that day's latest completed load. Without `--date`, it shows the last day the most recent `mlb_api` run loaded, which that run records in `data/mlb_api_last_day.txt`; if that run loaded no in-season day, it logs that there's nothing to show and exits `0`. CI and both scheduled workflows run it as their last step before uploading logs.
 
 ### List lake folders
 
