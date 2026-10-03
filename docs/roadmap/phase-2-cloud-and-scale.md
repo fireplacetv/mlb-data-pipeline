@@ -1,6 +1,6 @@
 # Phase 2 — Cloud and Scale
 
-**Status:** in progress
+**Status:** shipped (2026-10-03). The shipped design is in `ARCHITECTURE.md` (§6.2, §6.6, §7.2, §9.4, §10); this doc keeps the design history and decision log.
 
 ## Summary
 
@@ -50,7 +50,7 @@ Requires Phase 0 (pipeline and staging) to be complete. Phase 1 (modeling layer)
 
 - `docker-compose.yml`: no change. `env_file: .env` already passes every variable in `.env` to the containers, and `.env.example` is the one list of variables (decided in P2M1 review, instead of repeating each one under `environment:`). The scheduled workflow (P2M2) builds `.env` from `.env.example`, as CI does, and appends `S3_BUCKET_URL`, `IS_PROD=true`, and the R2 secrets to it.
 - `.env.example`: document new vars and their defaults (local paths).
-- CI workflow (`.github/workflows/scheduled-ingest.yml`): new job, runs daily at 2 AM UTC (after games end, before US morning).
+- CI workflow (`.github/workflows/scheduled-ingest.yml`): new job, runs daily at 9 AM UTC (1–2 AM Pacific, after West Coast games end; originally 2 AM UTC, moved in PR #17).
   - Sets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_URL` from GitHub Actions Secrets, by writing them into the runner's `.env`.
   - Sets `IS_PROD=true` (gates R2 writes; dev runs omit this to stay local).
   - Runs ingest commands, then `dbt build`, then updates the data report.
@@ -109,7 +109,7 @@ Update §9 (Environment) to include the scheduled-ingest workflow and GitHub Act
 **Goal:** pipeline runs automatically every day, ingests yesterday's data, builds dbt, generates report. No manual intervention needed.
 
 **Acceptance checks:**
-- `.github/workflows/scheduled-ingest.yml` exists and is triggered daily at 2 AM UTC (off-season or seasonal?).
+- `.github/workflows/scheduled-ingest.yml` exists and is triggered daily at 2 AM UTC (off-season or seasonal?). (Since moved to 9 AM UTC, PR #17.)
 - Workflow reads R2 credentials from GitHub Actions Secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`).
 - Workflow sets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_URL`, `IS_PROD=true`.
 - Workflow runs: `docker compose run --rm pipeline python -m mlb.pipelines.statcast`, `docker compose run --rm pipeline python -m mlb.pipelines.mlb_api`, `docker compose run --rm dbt build`, `docker compose run --rm reports run build`.
@@ -151,11 +151,12 @@ Revisit only if the project moves to multiple concurrent writers, needs lake-lev
 
 ## Open Questions
 
-- ~~What time should the daily scheduled run happen?~~ Decided in P2M2: 2 AM UTC, unchanged from the stub proposal; revisit if it turns out to miss late West Coast games.
+- ~~What time should the daily scheduled run happen?~~ Decided in P2M2: 2 AM UTC, unchanged from the stub proposal. Moved to 9 AM UTC in PR #17: 2 AM UTC is 7 PM Pacific in season, before West Coast games end.
 - ~~Should off-season runs skip or continue?~~ Decided in P2M2: continue year-round. The cron doesn't pause itself; the existing season-window skip (`SEASON_START`/`SEASON_END`) already makes an off-season run a no-op (0 rows), so there's nothing extra to build.
 - ~~Failure notification: silent, GitHub Issues, Slack, email?~~ Decided in P2M2: none beyond GitHub's own red run and the uploaded logs artifact. Slack/email was optional scope; revisit if a failure is ever missed because no one was watching the Actions tab.
 - ~~P2M2: how does the prod `dbt build` read the R2 lake?~~ Decided in P2M1: dbt reads `s3://` directly through DuckDB `httpfs` (see Changes to dbt models).
-- R2 cost: acceptable for personal project? (Tentatively: yes; ~$5/month for storage at typical ingestion rate.)
+- ~~R2 cost: acceptable for personal project?~~ Closed at ship: accepted as tentatively proposed (estimated ~$5/month at most for storage at typical ingestion rate). Cost monitoring stays out of scope; revisit if the bill surprises.
+- Disabling `backfill.yml` once it reaches yesterday: not built. After completion each firing is a fast no-op; disable the workflow from the Actions tab if wanted. Not worth code.
 
 ## Status / Decision Log
 
@@ -168,6 +169,8 @@ Revisit only if the project moves to multiple concurrent writers, needs lake-lev
 - **2026-10-01:** First scheduled run failed: `needs AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY`. The repo had never had `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` Secrets set — the R2 keys were pasted into repo **Variables** named `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` instead (wrong mechanism, and unmasked in a public repo). Renamed the workflow's secret references from `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` to `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` so the Secret name matches the env var it maps to (no more R2→AWS rename step to get wrong); updated `docs/usage.md`, `docs/setup.md`, `docs/configuration.md` to match. Separately, and not part of this PR: the leaked token must be rotated in Cloudflare and the plaintext Variables deleted before the new Secrets are set.
 - **2026-10-01:** P2M4 designed and built. Starting from "schedule the existing backfill on cron and let a timeout kill it," empirically checked `next_watermark(loaded_through=yesterday, window=<a 2015 chunk>, failed_days=[])` against the live `scheduled-ingest.yml` watermark and confirmed it returns `loaded_through` unchanged — the watermark's never-moves-backward rule, already relied on for safe manual backfills, also means a disconnected backfill chunk can never advance it once the nightly catch-up has run even once. Ruled out computing the next chunk in workflow shell from `dlt pipeline ... info -v` for the same reason: the quantity it would parse (`loaded_through`) is the wrong one, not just an untestable-shell-logic problem. Decided: track backfill progress through a new, separate state key, `backfilled_through` (precedent: `mlb_api`'s `people_fetched`), with its own pure chooser `config.next_backfill_window` reusing `next_watermark`'s existing connected/failed-day rules against that key; a new `--chunk-days [N]` flag on both pipelines (defaulting `N` to `BACKFILL_CHUNK_DAYS` when omitted, mutually exclusive with `--start`/`--end`); and a new workflow, `.github/workflows/backfill.yml`, on its own daily schedule, using `secrets.AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` per the rename above, sharing `scheduled-ingest`'s concurrency group (both write the same R2 lake and pipeline state; a long chunk can push that day's catch-up out of the queue, which self-heals via `LOOKBACK_DAYS` the next day) and skipping `dbt build`/warehouse upload (redundant with `scheduled-ingest.yml`'s own daily rebuild). Verified with a unit test chaining `next_backfill_window` through `next_watermark` across simulated firings: every day from `BACKFILL_START` to yesterday is covered exactly once, with no gaps or repeats, converging to a terminus that then no-ops.
 - **2026-10-02:** CI (`ci.yml`, alongside the Evidence report) and both scheduled workflows (`scheduled-ingest.yml`, `backfill.yml`) gained a final **Box scores (last day loaded)** step, for eyeballing each run in its Actions log. It runs `python -m mlb.box_scores`, which reads the box scores back from the lake (not the API, so it verifies what landed) for the last day the run's `mlb_api` step loaded. The pipeline records that day in `<MLB_DATA_DIR>/mlb_api_last_day.txt` (cleared at the start of each run, so a run that loads no day — e.g. an off-season-only backfill chunk — shows nothing rather than a stale day). Reading uses dlt's `pipeline.dataset()`, so it needs no lake/credential setup of its own. The step runs on `!cancelled()`, after the ingest steps, so a failed day elsewhere in the window doesn't hide the box scores of the days that did load, and a display problem can't block the warehouse upload.
+- **2026-10-01:** `scheduled-ingest.yml` moved from `0 2 * * *` to `0 9 * * *` (PR #17): 2 AM UTC is 7 PM Pacific during the regular season, before West Coast games finish. `backfill.yml` stays at `0 4 * * *`, still offset from it.
+- **2026-10-03:** Phase `shipped`. P2M1, P2M2 and P2M4 done, and production verified end to end: the scheduled catch-up, a manual catch-up, and the first automatic backfill chunk all ran green against the real R2 bucket. P2M3 (Delta Lake) stays deferred. Folded into `ARCHITECTURE.md` as a new §9.4 (production operation) plus updates to §1, §3, §4, §5, §6.2, §6.6, §7.2, §9, §10, §11 and §12, rather than the new §13 proposed above (§13 is already the tooling references). Phase 1 (modeling layer) is next.
 
 ## References
 

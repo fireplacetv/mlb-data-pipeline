@@ -345,7 +345,7 @@ docker compose run --rm pipeline python -m mlb.box_scores
 
 `.github/workflows/scheduled-ingest.yml` runs the production pipeline daily with no manual intervention (`docs/roadmap/phase-2-cloud-and-scale.md`, P2M2): catch up both pipelines against the R2 lake, rebuild the warehouse, and upload it to R2. It does not build or publish the data report — that stays CI-only, built from CI's own fixed-day data (see "Data Report" and "Continuous Integration" above), not from production data.
 
-**Schedule:** `0 2 * * *` (2 AM UTC), every day of the year. Off-season days load zero games — the pipelines already skip dates outside the season (`SEASON_START`/`SEASON_END`) — so nothing special is needed to pause it.
+**Schedule:** `0 9 * * *` (9 AM UTC, which is 1 AM Pacific in winter and 2 AM in summer, after West Coast games end), every day of the year. Off-season days load zero games — the pipelines already skip dates outside the season (`SEASON_START`/`SEASON_END`) — so nothing special is needed to pause it.
 
 **What it does, on an `ubuntu-latest` runner:**
 
@@ -356,7 +356,7 @@ docker compose run --rm pipeline python -m mlb.box_scores
 5. Logs the box scores of every game on the last day the MLB Stats API step loaded (`python -m mlb.box_scores`, see "Show box scores" below), for a quick visual check of the run. It runs even if an earlier step failed.
 6. Uploads `data/logs/` and `dbt/logs/` as the `scheduled-ingest-logs` artifact, even on failure.
 
-A failed run shows red in the Actions tab and in its job summary; there's no separate notification channel today (open question in the phase doc).
+A failed run shows red in the Actions tab and in its job summary; there's no separate notification channel (decided in the Phase 2 doc; revisit if a failure is ever missed).
 
 The `scheduled-ingest` concurrency group keeps runs from overlapping: a manual dispatch while the daily cron is still running (or a long backfill still in progress when the next day's run fires) queues instead of racing on the same R2 watermark.
 
@@ -383,7 +383,7 @@ The `scheduled-ingest` concurrency group keeps runs from overlapping: a manual d
 
 **If a day inside a chunk fails:** the whole chunk's `backfilled_through` mark holds at its prior value (the same "don't move on any failure" rule a manual backfill follows), the run exits `1`, and the next firing — scheduled or manual — retries the exact same chunk. No manual `--start`/`--end` re-run is needed.
 
-**Once the backfill reaches yesterday:** a firing logs `Backfill complete: reached yesterday (...); nothing to do.` and exits `0` having loaded nothing. The schedule keeps firing daily after that, but every run is a fast no-op — there is currently no step that disables the schedule once it's done; see "Open Questions" in the Phase 2 roadmap doc.
+**Once the backfill reaches yesterday:** a firing logs `Backfill complete: reached yesterday (...); nothing to do.` and exits `0` having loaded nothing. The schedule keeps firing daily after that, but every run is a fast no-op — there is no step that disables the schedule once it's done. To stop it, disable the workflow from the Actions tab (Actions → Automatic backfill → ⋯ → Disable workflow).
 
 **Concurrency:** `backfill.yml` shares `scheduled-ingest`'s concurrency group — both write the same R2 lake and dlt pipeline state, which assumes a single writer. A long chunk can push that day's catch-up out of the queue; the next day's catch-up self-heals via `LOOKBACK_DAYS`. It does not run `dbt build` or upload the warehouse: `scheduled-ingest.yml` already rebuilds the warehouse from the lake daily, so repeating that on every chunk would be pure waste and would hold the shared slot longer.
 

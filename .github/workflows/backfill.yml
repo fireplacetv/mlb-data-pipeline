@@ -12,7 +12,7 @@ name: Automatic backfill
 # loaded nothing; the schedule keeps firing, but every run after that is a fast no-op.
 on:
   schedule:
-    # Once a day. Offset from scheduled-ingest's 2 AM UTC catch-up so the two aren't both
+    # Once a day. Offset from scheduled-ingest's 9 AM UTC catch-up so the two aren't both
     # trying to start in the same shared concurrency slot at once.
     - cron: "0 4 * * *"
   workflow_dispatch:
