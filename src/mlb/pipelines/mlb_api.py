@@ -9,6 +9,9 @@ A run is several dlt loads, one per step, all under the `mlb_api` source:
    `rosters` as of the window's end date.
 3. One final load: `people` bios for player ids not fetched before. It also saves the
    watermark and the fetched ids, so neither moves unless every earlier step finished.
+
+After step 1, the run records the last day it loaded in <data dir>/mlb_api_last_day.txt,
+for `python -m mlb.box_scores` to show that day's box scores.
 """
 
 import argparse
@@ -40,6 +43,7 @@ PIPELINE_NAME = "mlb_api"
 DATASET_NAME = "raw_mlb"
 SOURCE_NAME = "mlb_api"
 PEOPLE_FETCHED_KEY = "people_fetched"
+LAST_DAY_FILENAME = "mlb_api_last_day.txt"
 
 BASE_URL = "https://statsapi.mlb.com/api/"
 SPORT_ID_MLB = 1
@@ -349,6 +353,21 @@ def load_days(
         outcomes.loaded.append(day)
 
 
+def last_day_path(data_dir: Path) -> Path:
+    """Where a run records the last day it loaded (absent if it loaded none)."""
+    return data_dir / LAST_DAY_FILENAME
+
+
+def record_last_day(data_dir: Path, loaded: list[date]) -> None:
+    """Record the last day loaded, or clear a previous run's record if no day loaded."""
+    path = last_day_path(data_dir)
+    if not loaded:
+        path.unlink(missing_ok=True)
+        return
+    path.write_text(f"{max(loaded).isoformat()}\n")
+    logger.info("Last day loaded: %s", max(loaded))
+
+
 def log_outcomes(outcomes: RunOutcomes) -> None:
     """Log per-day counts of loaded, off-season, and failed days."""
     logger.info(
@@ -379,6 +398,7 @@ def run(
     the backfill reaches yesterday.
     """
     run_started = time.monotonic()
+    record_last_day(data_dir, [])
     try:
         pipeline = build_pipeline(data_dir, schema_dir, lake)
     except config.LakeConfigError as exc:
@@ -412,6 +432,7 @@ def run(
     outcomes = RunOutcomes()
     before = common.table_columns(pipeline)
     load_days(pipeline, window, session, sleep, outcomes)
+    record_last_day(data_dir, outcomes.loaded)
     run_step(
         pipeline,
         snapshot_config(window, outcomes.player_ids, session),

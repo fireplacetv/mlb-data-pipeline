@@ -94,6 +94,14 @@ jobs:
           if [ -n "$CHUNK_DAYS" ]; then args+=("$CHUNK_DAYS"); fi
           docker compose run --rm pipeline python -m mlb.pipelines.mlb_api "${args[@]}"
 
+      # A quick visual check of what this run landed: box scores for every game on the last
+      # day the MLB Stats API step loaded, read back from the lake (python -m mlb.box_scores).
+      # Runs even if an ingest step failed, so the days that did load can still be eyeballed;
+      # logs "nothing to show" if no in-season day loaded (e.g. an off-season-only chunk).
+      - name: Box scores (last day loaded)
+        if: ${{ !cancelled() }}
+        run: docker compose run --rm pipeline python -m mlb.box_scores
+
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4

@@ -100,6 +100,13 @@ jobs:
           path: reports/build/
           if-no-files-found: error
 
+      # Alongside the report, a quick look at the day just ingested right in the job log:
+      # box scores for every game on the last day the MLB Stats API step loaded, read back
+      # from the lake (python -m mlb.box_scores). Runs even if dbt or the report failed.
+      - name: Box scores (last day loaded)
+        if: ${{ !cancelled() }}
+        run: docker compose run --rm pipeline python -m mlb.box_scores
+
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
