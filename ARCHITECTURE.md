@@ -673,7 +673,7 @@ These items are grouped into development phases, each with a design doc in `docs
 
 **Phase 2 — Cloud and Scale** (shipped, folded into this file: §6.2, §6.6, §9.4, §10). Still deferred from it: the Delta Lake table format (P2M3).
 
-**Phase 1 — Modeling Layer** (next; proposed, milestones not yet written):
+**Phase 1 — Modeling Layer** (next; proposed, milestones drafted in its design doc):
 - **Intermediate models:** events, games with derived status, seasons with aggregated stats.
 - **Facts and dimensions:** player, team, pitch outcome definitions.
 - **Calculated metrics:** batting average, OPS, wOBA, ERA, strikeout rate, WHIP.
