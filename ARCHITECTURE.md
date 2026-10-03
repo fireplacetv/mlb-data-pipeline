@@ -1,9 +1,9 @@
 # MLB Data Pipeline — Architecture & Build Spec
-## Phase 0: Data Pipeline (Shipped)
+## Phase 0: Data Pipeline + Phase 2: Cloud and Scale (Shipped)
 
-> **How to use this document:** This file is the source of truth for Phase 0 (the data pipeline). It describes the shipped architecture: dlt extract/load to a local lake, dbt staging layer, and Docker setup. Build one milestone at a time (§10), in order. Each milestone has acceptance checks that must pass before moving on. When this doc and a library's current docs disagree on API details, follow the library docs and update this file.
+> **How to use this document:** This file is the source of truth for the shipped pipeline: Phase 0 (dlt extract/load, dbt staging layer, Docker setup) plus Phase 2 (a Cloudflare R2 lake in production and scheduled GitHub Actions runs, §9.4). Build one milestone at a time (§10), in order. Each milestone has acceptance checks that must pass before moving on. When this doc and a library's current docs disagree on API details, follow the library docs and update this file.
 >
-> **Roadmap:** Phase 0 is complete. Phase 1 (modeling layer) and Phase 2 (cloud and scale) are documented in `docs/roadmap/`. Phase 2 is currently in progress. See `docs/roadmap/README.md` for status.
+> **Roadmap:** Phases 0 and 2 are complete; Phase 2's design history and decision log stay in `docs/roadmap/phase-2-cloud-and-scale.md`. Phase 1 (modeling layer) is next and is documented in `docs/roadmap/`. See `docs/roadmap/README.md` for status.
 
 ---
 
@@ -11,13 +11,14 @@
 
 A containerized **ELT data pipeline** for MLB data:
 
-- **Extract + Load:** `dlt` pulls from Baseball Savant (Statcast) and the MLB Stats API and lands raw data as **Parquet files** in a local lake.
+- **Extract + Load:** `dlt` pulls from Baseball Savant (Statcast) and the MLB Stats API and lands raw data as **Parquet files** in a lake: a local folder for development and CI, a Cloudflare R2 bucket in production (§6.2).
 - **Transform (minimal):** `dbt` builds a thin **staging layer** in **DuckDB**: typed, renamed, deduplicated, one model per raw table. No business logic.
 - **Warehouse:** DuckDB. Another warehouse such as Postgres is possible someday, not planned. The design avoids unnecessary DuckDB lock-in, but a move would still mean some dbt changes (§8).
 
 **In scope:**
 - Docker + Docker Compose environment, so every user runs identical versions with one command
-- Two dlt pipelines (Statcast, MLB Stats API), with catch-up and backfill modes
+- Two dlt pipelines (Statcast, MLB Stats API), with catch-up, backfill, and automatic chunked backfill modes (§6.6)
+- Production runs on a schedule: GitHub Actions workflows catch up daily and backfill history against the R2 lake, with credentials in GitHub Actions Secrets (§9.4)
 - dbt project with sources, staging models, and staging-level tests
 - Documented commands instead of a wrapper layer: each step runs directly with `docker compose run` (pipeline modules and `dbt`), listed in a Quick Start in `README.md` with fuller reference in `docs/` (§9.1)
 - Unit tests with recorded fixtures, and CI
@@ -27,10 +28,11 @@ A containerized **ELT data pipeline** for MLB data:
 **Out of scope:**
 - Intermediate models, facts, dimensions, marts, snapshots, rolling metrics, or any other business logic
 - A semantic layer, BI, dashboards, notebooks, or reports beyond the CI smell-test report in §9.3
-- Scheduling and orchestration (cron, Dagster, Airflow). Every run is started by hand with the documented commands.
-- Cloud hosting and multi-user access
+- Orchestration beyond GitHub Actions cron (Dagster, Airflow). Development runs are started by hand with the documented commands.
+- The Delta Lake table format (deferred; plain Parquet plus staging dedup is enough, see Phase 2 P2M3)
+- Multi-user access or a shared cloud warehouse. The production warehouse is still one DuckDB file, rebuilt each run and uploaded to R2 (§9.4)
 
-**Done means:** on a clean machine with only Docker and git, following the README Quick Start (build, ingest two days, `dbt build`) produces tested staging tables in DuckDB, and they can be rebuilt from the lake at any time without calling the APIs again.
+**Done means:** on a clean machine with only Docker and git, following the README Quick Start (build, ingest two days, `dbt build`) produces tested staging tables in DuckDB, and they can be rebuilt from the lake at any time without calling the APIs again. In production, the same commands run unattended every day against R2 (§9.4).
 
 ---
 
@@ -55,10 +57,11 @@ A containerized **ELT data pipeline** for MLB data:
 | Extract + load | `dlt` | `filesystem` destination, Parquet format: local folder for dev/CI, S3-compatible (Cloudflare R2) for prod (Phase 2, `S3_BUCKET_URL`) |
 | Statcast access | `pybaseball` | Wrapped as a dlt resource |
 | MLB Stats API | `dlt` REST API source | `https://statsapi.mlb.com`, no auth |
-| Raw storage | Parquet on local disk | `data/lake/` |
-| Warehouse | DuckDB | `data/warehouse/mlb.duckdb` |
+| Raw storage | Parquet on local disk (dev, CI) or Cloudflare R2 (prod) | `data/lake/`, or the bucket in `S3_BUCKET_URL` (§6.2) |
+| Warehouse | DuckDB | `data/warehouse/mlb.duckdb`; in prod, rebuilt each run and uploaded to R2 (§9.4) |
 | Transform | `dbt-core` + `dbt-duckdb` | Staging layer only |
 | Quality | dbt tests, `pytest`, `ruff` | Run by hand and in CI |
+| Scheduling | GitHub Actions (cron) | `scheduled-ingest.yml` (daily catch-up), `backfill.yml` (history), §9.4 |
 | Data report | Evidence (open-source static build, Node) | `reports/`; its own `node` service, not the Python image (§9.3) |
 
 **Python dependencies** (declared in `pyproject.toml`, locked in `uv.lock`):
@@ -87,6 +90,8 @@ pybaseball is lightly maintained and pins older libraries in places. M0 must con
                           staging.*  typed, renamed, deduplicated, 1:1 with raw tables
 ```
 
+In production the lake is an R2 bucket (`s3://<bucket>/raw_statcast/...`, same layout), dbt reads it over DuckDB's `httpfs`, and GitHub Actions runs every step on a schedule (§9.4).
+
 ---
 
 ## 5. Repository layout
@@ -113,14 +118,17 @@ mlb-pipeline/
 ├── docker-compose.yml
 ├── .github/workflows/
 │   ├── ci.yml                   # ingest, dbt, data report (§9)
-│   └── report-preview-cleanup.yml  # removes a PR's report preview when it closes (§9.3)
+│   ├── report-preview-cleanup.yml  # removes a PR's report preview when it closes (§9.3)
+│   ├── scheduled-ingest.yml     # daily production catch-up + dbt build + warehouse upload (§9.4)
+│   └── backfill.yml             # daily production history backfill, --chunk-days (§9.4)
 ├── .dlt/
 │   └── config.toml              # dlt runtime + destination config (no secrets)
 ├── schemas/
 │   └── export/                  # dlt schemas exported after each run, committed (§6.5)
 ├── src/mlb/
 │   ├── __init__.py
-│   ├── config.py                # env vars, paths, date-window helpers
+│   ├── config.py                # env vars, paths, lake destination, date-window helpers
+│   ├── box_scores.py            # prints the last loaded day's box scores, read from the lake
 │   └── pipelines/
 │       ├── common.py            # shared dlt helpers: lake pipeline, watermark, run logging
 │       ├── statcast.py          # dlt resource + pipeline
@@ -129,6 +137,7 @@ mlb-pipeline/
 │   ├── dbt_project.yml
 │   ├── profiles.yml             # checked in; paths/credentials from env vars
 │   ├── packages.yml             # dbt_utils
+│   ├── macros/                  # generate_schema_name, lake_root (local or s3:// lake)
 │   ├── models/staging/
 │   │   ├── _dlt/                # stg_dlt__completed_loads
 │   │   ├── statcast/
@@ -182,7 +191,8 @@ The pybaseball README notes that Statcast data can change even for past seasons.
 
 ### 6.2 Common settings
 
-- Destination: `filesystem`, `bucket_url = <MLB_DATA_DIR>/lake`, file format `parquet`, default layout `{table_name}/{load_id}.{file_id}.{ext}`. Set `bucket_url` in code from `MLB_DATA_DIR`. `.dlt/config.toml` holds only static settings. Phase 2 (P2M1) adds `S3_BUCKET_URL`: when set, the lake goes there instead (a Cloudflare R2 bucket in prod, given as the bucket's S3 API URL and gated by `IS_PROD`); see `docs/roadmap/phase-2-cloud-and-scale.md` and `docs/configuration.md`.
+- Destination: `filesystem`, `bucket_url = <MLB_DATA_DIR>/lake`, file format `parquet`, default layout `{table_name}/{load_id}.{file_id}.{ext}`. Set `bucket_url` in code from `MLB_DATA_DIR`. `.dlt/config.toml` holds only static settings.
+- **Production lake (R2).** When `S3_BUCKET_URL` is set, the lake goes there instead. It takes the bucket's S3 API URL exactly as Cloudflare shows it, optionally with a folder: `https://<account id>.r2.cloudflarestorage.com/<bucket>[/<folder>]`. `config.resolve_lake` splits it into the endpoint and an `s3://<bucket>[/<folder>]` URL, and `pipelines/common.py` builds the dlt destination and credentials in code (region `auto`, keys from `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`). `IS_PROD` gates it both ways: an R2 lake needs `IS_PROD=true`, and `IS_PROD=true` with the local lake is refused, so a dev run can't write to production and a prod run can't quietly write to a throwaway disk. A mismatch, missing keys, or a URL that stops at the account endpoint exits `2` with a message naming the setting. Every run logs its destination first (`Lake destination: ...`), never the credentials. See `docs/configuration.md`.
 - Write disposition: **`append` for every resource.** Don't use `replace`: on the filesystem destination it deletes the table's existing files, which breaks principle 1 and would drop earlier seasons. Staging deduplicates instead.
 - Each pipeline has its own `pipeline_name` and `dataset_name`. dlt syncs pipeline state to the destination (`_dlt_pipeline_state/`).
 - Set `pipelines_dir` to `<MLB_DATA_DIR>/dlt_pipelines`. Containers run with `--rm`, so dlt's home-directory default would be lost after every run.
@@ -257,7 +267,7 @@ The schema export also answers "what changed and when" without querying the lake
 
 ### 6.6 Incremental loading
 
-Runs are started by hand, so the pipelines must not assume they ran yesterday. Each pipeline remembers how far it has loaded and catches up from there.
+Runs are started by hand in development and by a schedule in production (§9.4), and either can be missed, so the pipelines must not assume they ran yesterday. Each pipeline remembers how far it has loaded and catches up from there.
 
 **Watermark.** Each pipeline stores `loaded_through`, the last date for which every day loaded successfully, in dlt source state (`dlt.current.source_state()`). dlt saves state together with the load (and syncs it to the lake), so the watermark only moves forward when the data it describes has actually landed. A failed load leaves it unchanged.
 
@@ -274,7 +284,7 @@ The watermark never moves backward: a failure inside the lookback days, or a bac
 
 Defaults: `LOOKBACK_DAYS=4` (Savant revises recent games) and `MAX_CATCHUP_DAYS=30` (bigger gaps are deliberate backfills). Both are env vars.
 
-**Automatic backfill (`--chunk-days`, Phase 2 P2M4).** The watermark's never-moves-backward rule, which is what makes a disconnected manual backfill safe, also means it can't track backfill progress: once a day's catch-up has run, `loaded_through` sits at yesterday, and any backfill chunk into older history is permanently "disconnected" from it — `next_watermark` correctly refuses to move it, so a backfill tracked through `loaded_through` would never advance after the first catch-up run. `--chunk-days [N]` instead tracks its own mark, `backfilled_through`, in the same source state (alongside `people_fetched`'s precedent in `mlb_api`): it loads `N` days (`BACKFILL_CHUNK_DAYS` if `N` is omitted) starting the day after `backfilled_through`, or from `BACKFILL_START` if that mark doesn't exist yet, reusing `next_watermark`'s same connected/failed-day rules against that key instead of `loaded_through`. Chunks are built contiguous (`config.next_backfill_window`) — each starts the day after the previous one ended, including across the off-season — which is exactly what keeps the connectedness check passing on every firing. A day that fails holds `backfilled_through` at its prior value, so the next firing retries the same chunk; reaching yesterday returns no window at all, and the caller logs completion and loads nothing. This lets `.github/workflows/backfill.yml` make steady, unattended progress on its own schedule without the daily catch-up (`scheduled-ingest.yml`) resetting it, and without either job's run depending on the other's — see `docs/usage.md` ("Automatic Backfill") for why sizing each firing to one bounded, committing chunk also sidesteps a longer-standing problem: a GitHub Actions timeout killing one huge `pipeline.run()` mid-backfill commits nothing for Statcast (one dlt load for the whole window) and doesn't advance `mlb_api`'s watermark either (it's set only in the final `people` step), so either pipeline would silently restart from scratch on every firing if sized that way.
+**Automatic backfill (`--chunk-days`).** The watermark's never-moves-backward rule, which is what makes a disconnected manual backfill safe, also means it can't track backfill progress: once a day's catch-up has run, `loaded_through` sits at yesterday, and any backfill chunk into older history is permanently "disconnected" from it — `next_watermark` correctly refuses to move it, so a backfill tracked through `loaded_through` would never advance after the first catch-up run. `--chunk-days [N]` instead tracks its own mark, `backfilled_through`, in the same source state (alongside `people_fetched`'s precedent in `mlb_api`): it loads `N` days (`BACKFILL_CHUNK_DAYS` if `N` is omitted) starting the day after `backfilled_through`, or from `BACKFILL_START` if that mark doesn't exist yet, reusing `next_watermark`'s same connected/failed-day rules against that key instead of `loaded_through`. Chunks are built contiguous (`config.next_backfill_window`) — each starts the day after the previous one ended, including across the off-season — which is exactly what keeps the connectedness check passing on every firing. A day that fails holds `backfilled_through` at its prior value, so the next firing retries the same chunk; reaching yesterday returns no window at all, and the caller logs completion and loads nothing. This lets `.github/workflows/backfill.yml` make steady, unattended progress on its own schedule without the daily catch-up (`scheduled-ingest.yml`) resetting it, and without either job's run depending on the other's — see `docs/usage.md` ("Automatic Backfill") for why sizing each firing to one bounded, committing chunk also sidesteps a longer-standing problem: a GitHub Actions timeout killing one huge `pipeline.run()` mid-backfill commits nothing for Statcast (one dlt load for the whole window) and doesn't advance `mlb_api`'s watermark either (it's set only in the final `people` step), so either pipeline would silently restart from scratch on every firing if sized that way.
 
 **Why not dlt's cursor-based `dlt.sources.incremental`:** it filters out rows at or below the last cursor value it saw. The lookback re-pull exists precisely to reload those rows so revised data lands, and staging already deduplicates by latest load. A stored date watermark gives catch-up without dropping revisions.
 
@@ -316,7 +326,7 @@ mlb:
         s3_region: auto                        # else us-east-1
 ```
 
-Phase 2 (P2M1) added the `settings` block: DuckDB's S3 settings, so dbt can read the lake from R2 when `S3_BUCKET_URL` is set. The keys come from `AWS_*` env vars, which DuckDB reads itself, so no secret is in the profile. The image installs DuckDB's `httpfs` extension at build time from the locked `duckdb-extension-httpfs` package.
+The `settings` block holds DuckDB's S3 settings, so dbt can read the lake from R2 when `S3_BUCKET_URL` is set. The keys come from `AWS_*` env vars, which DuckDB reads itself, so no secret is in the profile. The image installs DuckDB's `httpfs` extension at build time from the locked `duckdb-extension-httpfs` package.
 
 `dbt_project.yml`: all staging models `materialized: table`, schema `staging`, and `packages-install-path: /opt/dbt_packages` so installed packages live outside the bind-mounted repo (§9). A `generate_schema_name` override in `dbt/macros/` makes the schema exactly `staging` (dbt's default would be `main_staging`). dbt's anonymous usage stats are off (`flags: send_anonymous_usage_stats: false`), like dlt's telemetry. At this data size (a few million pitches per season) a full rebuild takes seconds to minutes, and it avoids incremental-logic bugs. Revisit incremental only if rebuilds become slow.
 
@@ -335,7 +345,7 @@ sources:
       - name: pitches
 ```
 
-(Since Phase 2, P2M1, the path before `/raw_statcast` is the lake root, `s3://<bucket>[/<folder>]` from `S3_BUCKET_URL` or `<MLB_DATA_DIR>/lake`. The rule is in `dbt/macros/lake_root.sql` and repeated inline in the source YAML, which can't call macros.)
+(The path before `/raw_statcast` is the lake root, `s3://<bucket>[/<folder>]` from `S3_BUCKET_URL` or `<MLB_DATA_DIR>/lake`. The rule is in `dbt/macros/lake_root.sql` and repeated inline in the source YAML, which can't call macros.)
 
 `union_by_name = true` matters because columns drift across seasons (§6.5). `env_var()` renders inside source `meta` (verified with dbt-core 1.12 and dbt-duckdb 1.11).
 
@@ -512,9 +522,9 @@ services:
 - Every path comes from `MLB_DATA_DIR`. Never hard-code `./data` or `/data`.
 - One-shot commands only: `docker compose run --rm`. No long-running services. (The report's dev server is started the same way and stopped with Ctrl-C.)
 - No data or secrets in the image. `.env` is read at runtime.
-- `.env.example` documents `MLB_DATA_DIR`, `LOOKBACK_DAYS`, `MAX_CATCHUP_DAYS`, `GIANTS_TEAM_ID`, `LOG_LEVEL`, the `UID`/`GID` note for Linux, and (Phase 2) the lake destination: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_URL`, `IS_PROD`.
+- `.env.example` documents `MLB_DATA_DIR`, `LOOKBACK_DAYS`, `MAX_CATCHUP_DAYS`, `BACKFILL_START`, `BACKFILL_CHUNK_DAYS`, `GIANTS_TEAM_ID`, `LOG_LEVEL`, `DBT_OUTPUT_MODE`, the `UID`/`GID` note for Linux, and the lake destination: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_URL`, `IS_PROD`.
 - Only one process may write `mlb.duckdb` at a time.
-- Outbound HTTPS needed: `statsapi.mlb.com`, `baseballsavant.mlb.com`, plus PyPI and the dbt package hub at build time. The report (§9.3) also needs Docker Hub (`node` image), the npm registry, and `extensions.duckdb.org` (DuckDB's Parquet extension for WebAssembly, fetched when the report builds and again in the viewer's browser). No inbound ports, except the report's local dev server.
+- Outbound HTTPS needed: `statsapi.mlb.com`, `baseballsavant.mlb.com`, the R2 endpoint in `S3_BUCKET_URL` when it's set, plus PyPI and the dbt package hub at build time. The report (§9.3) also needs Docker Hub (`node` image), the npm registry, and `extensions.duckdb.org` (DuckDB's Parquet extension for WebAssembly, fetched when the report builds and again in the viewer's browser). No inbound ports, except the report's local dev server.
 
 **Commands.** There is no CLI wrapper or Makefile. These are the commands, and they're what `README.md` and `docs/usage.md` document:
 
@@ -524,6 +534,8 @@ services:
 | Ingest Statcast (catch up since last load) | `docker compose run --rm pipeline python -m mlb.pipelines.statcast` |
 | Ingest Statcast (backfill) | `docker compose run --rm pipeline python -m mlb.pipelines.statcast --start 2025-04-01 --end 2025-04-30` |
 | Ingest MLB Stats API | `docker compose run --rm pipeline python -m mlb.pipelines.mlb_api` (same `--start` / `--end` flags) |
+| Automatic backfill chunk | `docker compose run --rm pipeline python -m mlb.pipelines.statcast --chunk-days` (same for `mlb_api`; §6.6) |
+| Show the last loaded day's box scores | `docker compose run --rm pipeline python -m mlb.box_scores` |
 | Build and test staging | `docker compose run --rm dbt build` |
 | Rebuild from scratch | `docker compose run --rm dbt build --full-refresh` |
 | Run only some models | `docker compose run --rm dbt build --select stg_statcast__pitches` |
@@ -607,6 +619,38 @@ Docs live in the repo, in Markdown, and change in the same PR as the code they d
 
 **Publishing:** GitHub Pages from the `gh-pages` branch. On a PR from this repo, CI publishes to `pr-preview/pr-<N>/` with `rossjrw/pr-preview-action`, which comments the link on the PR; `report-preview-cleanup.yml` removes it when the PR closes. On push to `main`, CI publishes to the site root with `JamesIves/github-pages-deploy-action`, keeping `pr-preview/`. The build's `deployment.basePath` is appended to `evidence.config.yaml` in CI to match. After each deploy the job makes sure the branch root has a `.nojekyll` file: without it Pages runs Jekyll, which drops Evidence's `_app/` folder (all its CSS and JS), and neither deploy Action adds it. Both jobs share the `gh-pages` concurrency group. The site is public.
 
+The report is CI-only: it's built from CI's fixed-day data, never from production data, and the scheduled workflows (§9.4) don't build it.
+
+### 9.4 Production operation (R2 + GitHub Actions)
+
+Production runs the same image and the same commands as development, unattended, with the lake in Cloudflare R2. No code changes between local and R2: only environment variables (§6.2).
+
+**Where things live:**
+
+| | Development / CI | Production |
+|---|---|---|
+| Lake | `<MLB_DATA_DIR>/lake` (`S3_BUCKET_URL` empty, `IS_PROD=false`) | R2 bucket from `S3_BUCKET_URL`, `IS_PROD=true` |
+| dlt state (watermarks) | synced to the local lake | synced to the R2 lake, restored on every run by `sync_destination()` |
+| Warehouse | `data/warehouse/mlb.duckdb` | built on the runner from the R2 lake, then uploaded to the bucket as `mlb.duckdb` |
+| Credentials | none | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` from GitHub Actions Secrets |
+
+**dbt reads R2 directly.** The sources' `external_location` and `stg_dlt__completed_loads` use the lake root from `dbt/macros/lake_root.sql` (§7.2), and `profiles.yml` points DuckDB's S3 settings at the R2 endpoint. DuckDB reads the `AWS_*` keys from the environment, so no secret is in dbt's SQL or logs. `httpfs` is installed at image build, so no run downloads it. The warehouse stays a local file even in prod (DuckDB has no server mode to write to remotely) and is rebuilt from the lake every run, per principle 2. The upload makes the built warehouse outlive the runner; it is single-writer, one build at a time.
+
+**Workflows** (both on `ubuntu-latest`, `timeout-minutes: 120`):
+
+| Workflow | Schedule (UTC) | What it runs |
+|---|---|---|
+| `scheduled-ingest.yml` | `0 9 * * *` (1–2 AM Pacific, after West Coast games end) | Both pipelines with no flags (catch-up, §6.6), `dbt build`, upload `mlb.duckdb` to R2, then the box scores of the last day loaded. A manual run can pass `start` / `end` for a one-off backfill. |
+| `backfill.yml` | `0 4 * * *` | Both pipelines with `--chunk-days` (§6.6), then the box scores of the chunk's last in-season day. No `dbt build` or upload: `scheduled-ingest.yml` rebuilds daily anyway. A manual run can pass `chunk_days`. Once `backfilled_through` reaches yesterday, every firing is a fast no-op. |
+
+- Both run year-round. Off-season days load zero games through the existing season-window skip (§6.3), so nothing pauses the schedules.
+- Each workflow writes `.env` from `.env.example`, overriding `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (repository **Secrets**), `S3_BUCKET_URL` (a repository **variable**: it names a bucket, not a credential), `IS_PROD=true`, and the runner's `UID`/`GID`. Values are substituted from the environment in Python, never interpolated into a shell command.
+- Both share the `scheduled-ingest` concurrency group, without cancelling in-progress runs. They write the same lake and dlt state, which assumes one writer. A long backfill chunk can push that day's catch-up back in the queue; the next catch-up's `LOOKBACK_DAYS` covers it.
+- **Failure handling:** a failed run shows red in the Actions tab. Logs (`data/logs/`, plus `dbt/logs/` for `scheduled-ingest.yml`) upload as an artifact on every run, including failures. There is no Slack or email notification; revisit if a failure is ever missed. The box-scores step runs on `!cancelled()`, so the days that did load can still be eyeballed after a failed day.
+- Secrets never go in Variables, `.env.example`, or the repo. A key pasted somewhere unmasked must be rotated in Cloudflare.
+
+Setup (R2 bucket, API token, repository Secrets and variable) is in `docs/setup.md`; day-to-day operation (manual triggers, checking runs, tuning `BACKFILL_CHUNK_DAYS`) is in `docs/usage.md`.
+
 ---
 
 ## 10. Build milestones
@@ -640,6 +684,14 @@ Complete in order. Each milestone ends with its checks passing. All commands run
 
 Every milestone updates `docs/` for anything it adds or changes (commands, flags, variables, folders), including the README Quick Start. A milestone isn't done if the docs are stale.
 
+### Phase 2 milestones (shipped)
+
+Built after M4; full acceptance checks and decisions are in `docs/roadmap/phase-2-cloud-and-scale.md`.
+- **P2M1 — dlt → R2 + local flexibility:** the lake destination comes from env vars (§6.2), and dbt reads the lake wherever dlt wrote it (§7.2).
+- **P2M2 — GitHub Actions scheduled daily runs:** `scheduled-ingest.yml` (§9.4).
+- **P2M3 — Delta Lake:** deferred. Plain Parquet plus staging dedup already gives idempotent loads, and there is one writer. Revisit only for concurrent writers, lake-level dedup, or time travel on raw data.
+- **P2M4 — Automatic historical backfill:** `--chunk-days` and `backfilled_through` (§6.6), run by `backfill.yml` (§9.4).
+
 ---
 
 ## 11. Known gotchas (read before coding)
@@ -654,6 +706,9 @@ Every milestone updates `docs/` for anything it adds or changes (commands, flags
 - **Pitch vs. plate appearance:** a Statcast row is a pitch. `events` is only populated on the last pitch of a plate appearance. Staging doesn't aggregate, but document this on the model for downstream users.
 - **Batter vs. pitcher IDs:** Statcast has separate `batter` and `pitcher` columns, and `player_name` refers to only one of them. Staging renames them to `batter_id` / `pitcher_id`.
 - **Team abbreviations:** Statcast's team abbreviations don't always match the MLB API's. Staging leaves both as-is. A mapping seed belongs to the future modeling layer.
+- **`S3_BUCKET_URL` is the bucket's URL, not the account's:** Cloudflare shows the account endpoint (`https://<id>.r2.cloudflarestorage.com`) in several places. The lake needs the bucket's S3 API URL from the bucket's Settings page, ending in the bucket name. `config.py` refuses the bare endpoint with a message saying where to look.
+- **Secrets vs. variables in GitHub Actions:** the R2 keys must be repository **Secrets** named `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (same names as the env vars, so there's no rename step to get wrong). A repository Variable is shown unmasked, and this repo is public.
+- **One writer, two schedules:** `scheduled-ingest.yml` and `backfill.yml` share a concurrency group because they write the same lake and dlt state. Don't give either its own group.
 - **DuckDB locking:** DuckDB allows one writer. Don't hold a connection to `mlb.duckdb` while the pipeline runs. For ad-hoc queries, connect with `read_only=True` between runs.
 
 ---
@@ -662,13 +717,9 @@ Every milestone updates `docs/` for anything it adds or changes (commands, flags
 
 These items are grouped into development phases, each with a design doc in `docs/roadmap/` (§9.1). See `docs/roadmap/README.md` for current status.
 
-**Phase 2 — Cloud and Scale** (in progress):
-- **Cloud lake:** dlt destination to Cloudflare R2 for production (local filesystem preserved for CI).
-- **Scheduled runs:** GitHub Actions for daily automated ingests.
-- **Secrets management:** GitHub Actions Secrets for R2 credentials.
-- **Milestones:** P2M1 (dlt → R2 + local flexibility), P2M2 (GitHub Actions scheduled daily runs), P2M3 (Delta Lake, deferred), P2M4 (automatic historical backfill).
+**Phase 2 — Cloud and Scale** (shipped, folded into this file: §6.2, §6.6, §9.4, §10). Still deferred from it: the Delta Lake table format (P2M3).
 
-**Phase 1 — Modeling Layer** (on hold, independent of Phase 2):
+**Phase 1 — Modeling Layer** (next; proposed, milestones not yet written):
 - **Intermediate models:** events, games with derived status, seasons with aggregated stats.
 - **Facts and dimensions:** player, team, pitch outcome definitions.
 - **Calculated metrics:** batting average, OPS, wOBA, ERA, strikeout rate, WHIP.
