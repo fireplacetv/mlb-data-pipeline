@@ -96,69 +96,23 @@ In production the lake is an R2 bucket (`s3://<bucket>/raw_statcast/...`, same l
 
 ## 5. Repository layout
 
+The main components and where each lives. Individual files are described in the sections that own them.
+
 ```
 mlb-pipeline/
-├── ARCHITECTURE.md              # this file: the current, agreed spec
-├── CLAUDE.md                    # points to this file + coding conventions (§9.2)
-├── README.md                    # overview + Quick Start (all commands); links into docs/
-├── docs/
-│   ├── setup.md                 # environment setup, first run, troubleshooting
-│   ├── configuration.md         # every env var, .env, dlt config/secrets
-│   ├── usage.md                 # command reference: ingest, backfill, dbt, tests, reset
-│   └── roadmap/
-│       ├── README.md            # index: feature, status, link
-│       ├── _template.md         # template for new phase docs
-│       └── phase-N-<name>.md    # one design doc per future development phase
-├── pyproject.toml
-├── uv.lock
-├── .env.example
-├── .gitignore                   # data/, .env, dbt/target/, dbt/logs/, dbt/dbt_packages/
-├── Dockerfile
-├── .dockerignore
-├── docker-compose.yml
-├── .github/workflows/
-│   ├── ci.yml                   # ingest, dbt, data report (§9)
-│   ├── report-preview-cleanup.yml  # removes a PR's report preview when it closes (§9.3)
-│   ├── scheduled-ingest.yml     # daily production catch-up + dbt build + warehouse upload (§9.4)
-│   └── backfill.yml             # daily production history backfill, --chunk-days (§9.4)
-├── .dlt/
-│   └── config.toml              # dlt runtime + destination config (no secrets)
-├── schemas/
-│   └── export/                  # dlt schemas exported after each run, committed (§6.5)
+├── ARCHITECTURE.md, CLAUDE.md, README.md   # spec, conventions (§9.2), Quick Start
+├── docs/                    # setup, configuration, usage, roadmap/ phase docs (§9.1)
+├── Dockerfile, docker-compose.yml, pyproject.toml, uv.lock, .env.example   # environment (§9)
+├── .github/workflows/       # CI + data report (§9, §9.3); scheduled production runs (§9.4)
+├── .dlt/                    # static dlt config, no secrets (§6.2)
 ├── src/mlb/
-│   ├── __init__.py
-│   ├── config.py                # env vars, paths, lake destination, date-window helpers
-│   ├── box_scores.py            # prints the last loaded day's box scores, read from the lake
-│   └── pipelines/
-│       ├── common.py            # shared dlt helpers: lake pipeline, watermark, run logging
-│       ├── statcast.py          # dlt resource + pipeline
-│       └── mlb_api.py           # dlt REST API source + pipeline
-├── dbt/
-│   ├── dbt_project.yml
-│   ├── profiles.yml             # checked in; paths/credentials from env vars
-│   ├── packages.yml             # dbt_utils
-│   ├── macros/                  # generate_schema_name, lake_root (local or s3:// lake)
-│   ├── models/staging/
-│   │   ├── _dlt/                # stg_dlt__completed_loads
-│   │   ├── statcast/
-│   │   └── mlb/
-│   └── tests/                   # singular data tests
-├── reports/                     # Evidence data report (§9.3)
-│   ├── package.json, package-lock.json, evidence.config.yaml
-│   ├── sources/warehouse/       # connection.yaml + source queries against mlb.duckdb
-│   └── pages/                   # index.md (the report page), +layout.svelte (page chrome)
-├── tests/                       # pytest
-│   ├── fixtures/
-│   │   ├── api/                 # recorded MLB API responses
-│   │   ├── statcast/            # trimmed Statcast CSV/Parquet
-│   │   └── lake/                # tiny lake used by CI dbt build
-│   └── test_*.py
-└── data/                        # gitignored; bind-mounted to /data in containers
-    ├── lake/                    # Parquet landing zone (dlt)
-    ├── warehouse/               # mlb.duckdb (dbt)
-    ├── dlt_pipelines/           # dlt local working state
-    ├── cache/                   # pybaseball cache
-    └── logs/
+│   ├── config.py            # env vars, paths, lake destination, date windows
+│   └── pipelines/           # one dlt pipeline per source + shared helpers (§6)
+├── schemas/export/          # dlt schemas exported after each run, committed (§6.5)
+├── dbt/                     # project, profile, macros, staging models, singular tests (§7)
+├── reports/                 # Evidence data report (§9.3)
+├── tests/                   # pytest + recorded fixtures, incl. a tiny lake for CI
+└── data/                    # gitignored, mounted at /data: lake, warehouse, dlt state, caches, logs
 ```
 
 ---
