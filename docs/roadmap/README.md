@@ -6,7 +6,7 @@ This index shows the development phases: current status, one-line goal, and a li
 |---|---|---|---|
 | **Phase 0** | Data pipeline scaffold, dlt extract/load, dbt staging layer, Docker setup | **Shipped** | [`ARCHITECTURE.md`](../../ARCHITECTURE.md) |
 | **Phase 2** | Cloud and scale: R2 cloud lake, GitHub Actions scheduling, secrets management, automatic historical backfill | **Shipped** (2026-10-03; folded into `ARCHITECTURE.md`. P2M3, Delta Lake, stays deferred) | [`phase-2-cloud-and-scale.md`](./phase-2-cloud-and-scale.md) |
-| **Phase 1** | Modeling layer: a local Rill exploration tool, then intermediate models, facts, dimensions, rolling metrics; additional sources (FanGraphs, Baseball Reference, Chadwick) | **Proposed** (next up: milestones P1M0–P1M4 drafted, awaiting review before `accepted`) | [`phase-1-modeling-layer.md`](./phase-1-modeling-layer.md) |
+| **Phase 1** | Modeling layer: a local Rill exploration tool, then intermediate models, facts, dimensions, rolling metrics; additional sources (FanGraphs, Baseball Reference, Chadwick) | **Proposed** (next up: milestones P1M1–P1M5 drafted, awaiting review before `accepted`) | [`phase-1-modeling-layer.md`](./phase-1-modeling-layer.md) |
 
 ## How to Propose a New Phase
 
