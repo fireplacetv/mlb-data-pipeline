@@ -50,7 +50,7 @@ Phase 0 (pipeline and staging) and Phase 2 (daily refresh, history backfill) are
 6. **Which source counts.** Official counting stats (H, HR, BB, ER, outs, …) come from the MLB API boxscores, which are the official record. Statcast supplies pitch- and PA-level detail and wOBA, using Savant's own `woba_value` / `woba_denom` per PA (so wOBA uses Savant's season weights with no constants in our code).
 7. **Game types.** Season facts and metrics cover regular season (`R`) by default, with postseason (`F`, `D`, `L`, `W`) as a separate grain value. Spring training and exhibitions are excluded from season and career stats but stay in game-level facts.
 
-### Exploration tool (P1M1)
+### Exploration tool
 
 **Tool:** Rill Developer, the open-source local app (a single binary with DuckDB built in, serving a web UI). Its metrics views and explore dashboards slice a table by any dimension over any time range, and its profiler shows each column's distribution and nulls. Both fit "what's actually in here?" questions better than writing queries one at a time. Pin its version, the way `reports/` pins Evidence.
 
@@ -185,11 +185,8 @@ None.
 
 ## Open Questions
 
-- **Is Rill worth a new tool?** Alternatives with no new dependency: the DuckDB CLI's built-in web UI (`duckdb -ui`), or a notebook. Both are fine for one-off queries but have no slice-by-any-dimension dashboards or column profiling, which is what makes scanning ten seasons quick. Proposed: Rill, since it's local-only, reads DuckDB natively, and keeps its project as checked-in YAML and SQL.
 - **Production warehouse copy or the lake?** Reading the R2 Parquet lake directly would also show raw columns that staging drops, but it includes duplicate rows and incomplete loads, and Rill would have to redo staging's dedup. Proposed: the warehouse copy, and add a column to staging (P1M2 already does this) when exploration shows one is needed.
 - **Download helper: a `python -m mlb.…` module or a compose one-liner?** A module keeps config in `config.py` and gets a pytest test, per CLAUDE.md. Proposed: a small module.
-- **Does Rill outlive Phase 1?** Proposed: keep it as the place to sanity-check new marts, and revisit if a user-facing BI phase picks a different tool.
-
 - **Move FanGraphs / Baseball Reference / Chadwick to their own phase?** Recommended: yes. They need new pipelines, a crosswalk and a scraping-tolerance story, and nothing in P1M2–P1M5 depends on them. Keeping them here would make the phase twice as big for metrics (wRC+, WAR) that are explicitly out of scope above.
 - **Should the CI data report show any marts?** CI loads one day, so season and rolling numbers would be near-meaningless there. Proposed: no change to the report in this phase.
 - **"Career" from 2015 only:** acceptable, or should careers be omitted until older history (pre-Statcast boxscores) is loaded? Proposed: keep, documented as "since 2015".
