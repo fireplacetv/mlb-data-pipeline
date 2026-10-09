@@ -1,0 +1,37 @@
+# Metrics view over models/pa_reconciliation.sql. Slice how far Statcast and boxscore plate-
+# appearance counts disagree, by season, game type and side (P1M1's exploration target #3).
+version: 1
+type: metrics_view
+
+display_name: PA reconciliation
+description: Statcast vs. boxscore plate-appearance counts per game per team.
+model: pa_reconciliation
+timeseries: game_date
+
+dimensions:
+  - name: season
+    column: season
+  - name: game_type
+    display_name: Game type
+    column: game_type
+  - name: side
+    display_name: Home or away
+    column: side
+
+measures:
+  - name: team_game_count
+    display_name: Team-games
+    expression: count(*)
+  - name: statcast_pa_count
+    display_name: Statcast PAs
+    expression: sum(statcast_pa_count)
+  - name: boxscore_pa_count
+    display_name: Boxscore PAs
+    expression: sum(boxscore_pa_count)
+  - name: net_pa_diff
+    display_name: Net PA difference
+    description: Statcast PAs minus boxscore PAs, summed; positive means Statcast counts more.
+    expression: sum(pa_diff)
+  - name: mismatched_team_game_count
+    display_name: Team-games where the counts disagree
+    expression: count(*) filter (where pa_diff <> 0)

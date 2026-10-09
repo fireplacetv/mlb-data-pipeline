@@ -28,6 +28,27 @@ services:
     entrypoint: ["sh", "-c", 'mkdir -p "$$MLB_DATA_DIR/warehouse" && exec dbt "$$@"', "dbt"]
     command: ["build"]
 
+  # Rill Developer over a downloaded copy of the production warehouse (P1M1,
+  # docs/roadmap/phase-1-modeling-layer.md). Local-only development aid: not built, published,
+  # or deployed in CI. Run `docker compose run --rm pipeline python -m mlb.explore` first to
+  # create data/explore/mlb.duckdb (needs R2 settings in .env); explore/connectors/duckdb.yaml
+  # then attaches it read-only. UI at http://localhost:9009. Image tag unverified against
+  # Rill's current release in this change (no network access to check it when this was
+  # written; see the P1M1 decision log entry in docs/roadmap/phase-1-modeling-layer.md) --
+  # bump it if `docker compose up explore` can't find it.
+  explore:
+    image: rilldata/rill:v0.83.8
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /app/explore
+    environment:
+      HOME: /tmp
+    volumes:
+      - .:/app
+      - ./data:/data
+    ports:
+      - "9009:9009"
+    command: ["start"]
+
   # Evidence report over the warehouse (reports/). Node, not the Python image; reads
   # data/warehouse/mlb.duckdb read-only through the repo mount.
   reports:

@@ -1,0 +1,5 @@
+type: explore
+display_name: PA reconciliation
+metrics_view: pa_reconciliation_metrics
+dimensions: "*"
+measures: "*"

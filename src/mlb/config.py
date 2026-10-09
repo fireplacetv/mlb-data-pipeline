@@ -36,9 +36,13 @@ WAREHOUSE_DIR = MLB_DATA_DIR / "warehouse"
 DLT_PIPELINES_DIR = MLB_DATA_DIR / "dlt_pipelines"
 CACHE_DIR = MLB_DATA_DIR / "cache"
 LOGS_DIR = MLB_DATA_DIR / "logs"
+# Local copy of the production warehouse for the Rill exploration tool (P1M1); not created by
+# ensure_directories(), since most runs never need it.
+EXPLORE_DIR = MLB_DATA_DIR / "explore"
 
 # DuckDB warehouse
 WAREHOUSE_DB = WAREHOUSE_DIR / "mlb.duckdb"
+EXPLORE_DB = EXPLORE_DIR / "mlb.duckdb"
 
 # dlt schemas exported after every run, committed to git (ARCHITECTURE.md §6.5).
 # Lives in the repo, not under MLB_DATA_DIR: src/mlb/config.py -> repo root.

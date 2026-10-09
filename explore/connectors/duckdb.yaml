@@ -1,0 +1,15 @@
+# Overrides Rill's default (blank) embedded-DuckDB connector: attach the downloaded warehouse
+# copy read-only as its own catalog, then make it the default so models can query `staging.*`
+# directly (unqualified by a catalog name), the same as reports/sources/warehouse/connection.yaml.
+# /data/explore/mlb.duckdb is config.EXPLORE_DB as the `explore` docker-compose service mounts
+# it (MLB_DATA_DIR=/data); run `python -m mlb.explore` first to create it.
+#
+# Verify this against Rill's current connector docs if `rill start` rejects it
+# (https://docs.rilldata.com/reference/project-files/connectors) -- unverified in this change,
+# since the sandbox that wrote it had no network access to rilldata.com and no Rill binary to
+# test against (see the P1M1 decision log entry in docs/roadmap/phase-1-modeling-layer.md).
+type: connector
+driver: duckdb
+init_sql: |
+  attach '/data/explore/mlb.duckdb' as warehouse (read_only);
+  use warehouse;

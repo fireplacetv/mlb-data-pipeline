@@ -261,6 +261,35 @@ It shows no individual pitches or batted balls, which keeps the site small.
 
 ---
 
+## Exploring the Data
+
+`explore/` is a local-only [Rill Developer](https://docs.rilldata.com/) project (P1M1, `docs/roadmap/phase-1-modeling-layer.md`) over a downloaded copy of the **production** warehouse, which holds staging back to 2015. Unlike the Data Report, it's a development aid for checking the modeling layer's design against the full history, not something CI builds or anything that gets deployed: it runs only on your machine.
+
+**1. Download the warehouse copy.** Needs the R2 settings in `.env` that `scheduled-ingest.yml` uses in production (`S3_BUCKET_URL`, `IS_PROD=true`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`; see "Scheduled Runs and GitHub Actions" and `docs/configuration.md`) — the local dev lake has no R2 warehouse to read. Without them, the command fails with a message naming what's missing:
+
+```bash
+docker compose run --rm pipeline python -m mlb.explore
+```
+
+Downloads the bucket's `mlb.duckdb` object to `data/explore/mlb.duckdb` (pass `--dest` for another path). Re-run it to pick up a newer production build; it overwrites the existing copy.
+
+**2. Start Rill:**
+
+```bash
+docker compose up explore
+```
+
+Open http://localhost:9009. `explore/connectors/duckdb.yaml` attaches `data/explore/mlb.duckdb` read-only, so Rill never contends with a local `dbt build` for the warehouse file's lock, and it reads the already-deduplicated `staging.*` tables, the same source the Data Report uses. Stop with Ctrl-C; it doesn't write anything back to the warehouse copy.
+
+**What's there**, the three dashboards P1M1 starts with:
+- **Statcast pitches:** pitch and plate-appearance counts by season, game type, `events` value and pitch type — checking which `events` values actually occur against the `pa_events` seed planned for P1M3.
+- **Boxscore batting & pitching:** boxscore lines by season, team and game type.
+- **PA reconciliation:** per game per team, Statcast plate-appearance counts vs. boxscore plate appearances — checking Decision 6 (`ARCHITECTURE.md`) across full history, not just CI's one day.
+
+**Changing it:** `explore/models/*.sql` are plain DuckDB SQL over `staging.*`; `explore/metrics/*.yaml` define the measures and dimensions each dashboard slices by; `explore/dashboards/*.yaml` are the Explore dashboards themselves (one per metrics view). Rill picks up changes on save while `docker compose up explore` is running. Anything worth keeping as a real model belongs in dbt (`intermediate/` or `marts/`), tested — Rill here is for looking, not for logic that ships.
+
+---
+
 ## Testing and Quality
 
 ### Run unit tests

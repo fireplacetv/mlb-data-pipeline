@@ -1,0 +1,35 @@
+# Metrics view over models/pitches.sql. Slice pitch and plate-appearance counts by season,
+# game type, `events` value and pitch type (P1M1's exploration target #1).
+version: 1
+type: metrics_view
+
+display_name: Statcast pitches
+description: Pitch and plate-appearance counts by season, game type, events and pitch type.
+model: pitches
+timeseries: game_date
+
+dimensions:
+  - name: game_year
+    display_name: Season
+    column: game_year
+  - name: game_type
+    display_name: Game type
+    column: game_type
+  - name: events
+    display_name: Events
+    column: events
+  - name: pitch_type
+    display_name: Pitch type
+    column: pitch_type
+  - name: pitch_name
+    display_name: Pitch name
+    column: pitch_name
+
+measures:
+  - name: pitch_count
+    display_name: Pitches
+    expression: count(*)
+  - name: pa_count
+    display_name: Plate appearances
+    description: Pitches where `events` is set (one per plate appearance).
+    expression: count(*) filter (where events is not null)

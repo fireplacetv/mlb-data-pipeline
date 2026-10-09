@@ -1,0 +1,41 @@
+# Metrics view over models/boxscore_lines.sql. Slice boxscore batting and pitching coverage
+# by season, team and game type (P1M1's exploration target #2).
+version: 1
+type: metrics_view
+
+display_name: Boxscore batting & pitching
+description: Boxscore batting and pitching lines by season, team and game type.
+model: boxscore_lines
+timeseries: game_date
+
+dimensions:
+  - name: season
+    column: season
+  - name: game_type
+    display_name: Game type
+    column: game_type
+  - name: team_abbreviation
+    display_name: Team
+    column: team_abbreviation
+  - name: stat_type
+    display_name: Batting or pitching
+    column: stat_type
+
+measures:
+  - name: player_game_count
+    display_name: Player-games
+    expression: count(*)
+  - name: hits
+    expression: sum(hits)
+  - name: home_runs
+    display_name: Home runs
+    expression: sum(home_runs)
+  - name: base_on_balls
+    display_name: Walks
+    expression: sum(base_on_balls)
+  - name: strike_outs
+    display_name: Strikeouts
+    expression: sum(strike_outs)
+  - name: earned_runs
+    display_name: Earned runs
+    expression: sum(earned_runs)
