@@ -1,0 +1,5 @@
+type: explore
+display_name: Statcast pitches
+metrics_view: pitches_metrics
+dimensions: "*"
+measures: "*"

@@ -33,6 +33,7 @@ The pipeline stores everything here:
 - `<MLB_DATA_DIR>/dlt_pipelines/` — dlt pipeline state (watermarks, schemas)
 - `<MLB_DATA_DIR>/cache/` — pybaseball cache (Statcast downloads)
 - `<MLB_DATA_DIR>/logs/` — pipeline logs
+- `<MLB_DATA_DIR>/explore/` — downloaded copy of the production warehouse for the Rill exploration tool (`mlb.duckdb`; `python -m mlb.explore`, not created automatically). See "Exploring the Data" in `docs/usage.md`.
 
 The directory is created automatically if it doesn't exist. Parent directories must exist.
 

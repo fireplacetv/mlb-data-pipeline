@@ -1,0 +1,5 @@
+type: explore
+display_name: Boxscore batting & pitching
+metrics_view: boxscore_lines_metrics
+dimensions: "*"
+measures: "*"

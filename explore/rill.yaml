@@ -1,0 +1,6 @@
+# Rill Developer project file (P1M1, docs/roadmap/phase-1-modeling-layer.md). A local-only
+# development aid over a downloaded copy of the production warehouse (data/explore/mlb.duckdb,
+# via `python -m mlb.explore`); never built, published, or deployed. Rill's own default
+# `olap_connector` (the embedded DuckDB engine) stays in use: connectors/duckdb.yaml attaches
+# the warehouse copy to it, so models can query `staging.*` directly, same as reports/.
+display_name: MLB Data Exploration

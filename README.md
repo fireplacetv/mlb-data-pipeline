@@ -5,6 +5,7 @@ A containerized **ELT data pipeline** for MLB Statcast (Baseball Savant) and MLB
 - **Extract + Load:** [dlt](https://dlthub.com/) pulls raw data from Baseball Savant (via [pybaseball](https://github.com/jldbc/pybaseball)) and the MLB Stats API, landing it as Parquet files in a local data lake.
 - **Transform (minimal):** [dbt](https://www.getdbt.com/) builds a thin staging layer in [DuckDB](https://duckdb.org/): typed, renamed, deduplicated. One model per raw table, no business logic.
 - **Warehouse:** DuckDB, local.
+- **Exploring the data:** a local-only [Rill Developer](https://docs.rilldata.com/) project (`explore/`) over a downloaded copy of the production warehouse, for checking the upcoming modeling layer's design against full history. See [`docs/usage.md`](./docs/usage.md#exploring-the-data).
 
 On a clean machine with only Docker and git, follow the Quick Start below to ingest two days of data and build the staging layer in under five minutes.
 
